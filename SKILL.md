@@ -45,8 +45,34 @@ Supported output modes:
 
 ## Workflow Overview
 
+**Two branches** depending on output mode. Check which mode the user requested
+before starting (default = transcript-only).
+
 ```
-Download → Audio Extract+Validate → Transcribe → Structure → SVG+Keyframes → HTML Compose → Verify
+TRANSCRIPT ONLY (default):
+  Phase 1 → Phase 2 → Phase 3 → Phase 4 → Output transcript.md → DONE
+
+DEEP ANALYSIS (user asked for "深度分析"/"完整分析"/"HTML"):
+  Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6 → Phase 7 → Phase 8
+```
+
+**Phase summary**:
+| Phase | Required for | Description |
+|-------|-------------|-------------|
+| 1. Download | Both | yt-dlp + cookies + metadata |
+| 2. Audio | Both | Extract MP3 + ffprobe validate (±5%) |
+| 3. Transcribe | Both | TeleSpeechASR → SenseVoiceSmall → local Whisper |
+| 4. Structure | Both | Chapter breakdown, extract key points |
+| 5. SVG | Deep only | Content-driven diagrams per chapter |
+| 6. Keyframes | Deep only | UI/demo videos only; skip for talking-head |
+| 7. HTML | Deep only | Single-page with export toolbar |
+| 8. Verify | Deep only | Chrome headless screenshot + visual check |
+
+**Failsafe**: If Phase 3 (transcription) fails at all 3 tiers with no API key
+and no local Whisper, fall back to embedded subtitles from `--write-subs`
+(Phase 1). Extract SRT directly from the video file:
+```bash
+ffmpeg -i video.mp4 -map 0:s:0 output.srt
 ```
 
 Proceed phase by phase. If any phase fails, diagnose and retry before moving on.
@@ -164,12 +190,20 @@ Fast, no local compute, no model download. Two tiers:
 Both use the same OpenAI-compatible API. Request format:
 
 ```bash
-curl https://api.siliconflow.cn/v1/audio/transcriptions \
+curl -s --max-time 60 --retry 3 --retry-delay 2 \
+  https://api.siliconflow.cn/v1/audio/transcriptions \
   -H "Authorization: Bearer $API_KEY" \
   -F "file=@audio.mp3" \
   -F "model=TeleAI/TeleSpeechASR" \
   -F "response_format=verbose_json"
 ```
+
+**Retry & error handling**:
+- Connection timeout: 60s (`--max-time 60`)
+- Auto-retry on failure: 3 times (`--retry 3 --retry-delay 2`)
+- On HTTP 429 (rate limit): wait 30s then retry once
+- On HTTP 401/403 (auth failure): report to user, fall to next tier
+- On timeout: report and fall to next tier
 
 The `verbose_json` response includes segment-level timestamps (`segments[].start`,
 `segments[].end`, `segments[].text`). Convert this to SRT format for downstream
@@ -331,6 +365,12 @@ must be derived from the chapter's real content, not decorative or templated.
 For videos that show user interfaces (canvas, console, editor, document),
 extract a representative frame from each chapter. Skip this phase for
 pure talking-head or lecture-style videos.
+
+**Skip criteria** (skip Phase 6 if ANY of these are true):
+- Video is a 口播 / 单人对着镜头说话（no UI shown）
+- Screen content never changes significantly
+- The transcript contains no visual descriptions（"大家看这里","打开这个"）
+- Video is < 60 seconds (too short for meaningful frame extraction)
 
 ### Step 1: Identify Key Timestamps
 
@@ -500,9 +540,12 @@ html2canvas is unavailable, fall back to `window.print()` with dedicated
 
 ---
 
-## Phase 8: Verification
+## Phase 8: Verification (Deep Analysis Only)
 
 After generating the HTML and all supporting files, verify the output.
+
+**If Chrome is available**, follow the steps below. **If Chrome is not
+available**, skip to the manual checklist at the end of this section.
 
 ### Step 1: Chrome Headless Full-Page Screenshot
 
@@ -549,6 +592,16 @@ ffmpeg -i "<FULL_PAGE.png>" \
 
 If any rendering or layout issues are found, fix the HTML/CSS and re-verify
 until the output is clean.
+
+### No-Chrome Fallback Checklist
+
+If Chrome is unavailable, manually open `index.html` in any browser and check:
+- [ ] Page loads without errors (F12 Console — no red errors)
+- [ ] All chapter headings visible
+- [ ] Export buttons work (MD / DOCX / 长截图)
+- [ ] SVG diagrams render (not broken shapes)
+- [ ] Screenshot images load (no broken image icons)
+- [ ] Responsive: resize browser window to mobile width — layout still readable
 
 ---
 
@@ -654,14 +707,17 @@ Correction rules for Chinese transcription:
 |------|---------|----------|
 | `yt-dlp` | Video download | Always |
 | `ffmpeg` + `ffprobe` | Audio/video processing | Always |
+| `emoji` (Python) | SenseVoiceSmall text cleanup | If using SenseVoiceSmall |
 | 硅基流动 API Key | Cloud transcription (recommended) | Cloud mode |
-| `whisper` (local) | Fallback transcription | Only if no API key |
-| Chrome/Chromium | Headless verification | Optional |
+| `openai-whisper` | Local transcription fallback | Only if no API key |
+| Playwright CLI | Douyin/XHS video URL extraction | Douyin/XHS scenarios |
+| Chrome/Chromium | Headless verification | Optional (deep analysis mode) |
 
 Check tool availability:
 
 ```bash
 which yt-dlp ffmpeg ffprobe
+pip show emoji openai-whisper 2>/dev/null
 ```
 
 For cloud API, check keys are set as environment variables or in project config.

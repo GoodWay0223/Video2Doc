@@ -74,8 +74,9 @@ Video2Doc 是一个 **AI Agent Skill**，定义了从视频到文档的完整工
 | `ffmpeg` + `ffprobe` | 音视频处理 | ✅ |
 | 硅基流动 API Key | 云端转录（推荐） | 云端模式必需 |
 | `openai-whisper` | 本地转录兜底 | 无 API Key 时必需 |
-| Chrome/Chromium | 验证截图 | 可选 |
-| Playwright CLI | 抖音视频获取 | 抖音场景必需 |
+| `emoji` (Python) | SenseVoiceSmall emoji 清洗 | 使用 SenseVoiceSmall 时必需 |
+| Playwright CLI | 抖音/小红书视频 URL 获取 | 抖音/小红书场景必需 |
+| Chrome/Chromium | 深度分析验证截图 | 可选 |
 
 ## 安装
 

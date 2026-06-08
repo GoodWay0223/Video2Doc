@@ -188,9 +188,30 @@ footer{
 </footer>
 
 <script>
-// === Timestamp seek ===
+// === Timestamp seek — find nearest chapter ===
+(function(){
+  const chapters = Array.from(document.querySelectorAll('.chapter'));
+  const chapterStarts = chapters.map(ch => {
+    const tsLink = ch.querySelector('a.ts-link');
+    if (!tsLink) return {el: ch, start: Infinity};
+    // Parse MM:SS or HH:MM:SS from timestamp link text
+    const parts = tsLink.textContent.split(':').map(Number);
+    const secs = parts.length === 3 ? parts[0]*3600 + parts[1]*60 + parts[2]
+               : parts.length === 2 ? parts[0]*60 + parts[1] : 0;
+    return {el: ch, start: secs};
+  });
+  window._chapterStarts = chapterStarts;
+})();
+
 function seekTo(seconds) {
-  const target = document.getElementById('ch' + Math.floor(seconds/60));
+  if (!window._chapterStarts) return;
+  let target;
+  for (let i = window._chapterStarts.length - 1; i >= 0; i--) {
+    if (seconds >= window._chapterStarts[i].start) {
+      target = window._chapterStarts[i].el;
+      break;
+    }
+  }
   if (target) target.scrollIntoView({behavior:'smooth'});
 }
 
@@ -222,28 +243,33 @@ function exportMD() {
   document.querySelectorAll('.chapter').forEach(ch => {
     const h2 = ch.querySelector('h2');
     if (h2) md += '## ' + h2.textContent.replace(/\s+/g, ' ').trim() + '\n\n';
-    const content = ch.querySelector('.content');
-    if (content) {
-      content.querySelectorAll('p,blockquote,figure').forEach(el => {
-        if (el.tagName === 'FIGURE') {
-          const img = el.querySelector('img');
-          const cap = el.querySelector('figcaption');
-          if (img) md += '![' + (cap?.textContent || '') + '](' + img.src + ')\n\n';
-        } else if (el.tagName === 'BLOCKQUOTE') {
-          md += '> ' + el.textContent.replace(/\n/g, '\n> ') + '\n\n';
-        } else {
-          md += el.textContent.trim() + '\n\n';
-        }
-      });
-    }
+    // Collect ALL content: .content children AND sibling figures (SVG/screenshots)
+    const allEls = ch.querySelectorAll('.content p, .content blockquote, .chapter > figure');
+    allEls.forEach(el => {
+      if (el.tagName === 'FIGURE') {
+        const img = el.querySelector('img');
+        const svg = el.querySelector('svg');
+        const cap = el.querySelector('figcaption');
+        if (img) md += '![' + (cap?.textContent?.trim() || '截图') + '](' + img.src + ')\n\n';
+        if (svg) md += '<!-- SVG diagram: ' + (cap?.textContent?.trim() || el.querySelector('figcaption span')?.textContent || '') + ' -->\n\n';
+      } else if (el.tagName === 'BLOCKQUOTE') {
+        md += '> ' + el.textContent.replace(/\n/g, '\n> ') + '\n\n';
+      } else {
+        md += el.textContent.trim() + '\n\n';
+      }
+    });
   });
   downloadFile(md, title + '.md', 'text/markdown');
 }
 
-// === Export: DOCX ===
+// === Export: Word 文档 (.doc, Word 可打开) ===
 function exportDOCX() {
   const title = document.querySelector('header h1').textContent;
-  const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><title>' + title + '</title></head><body>' + document.querySelector('main').innerHTML + '</body></html>';
+  const meta = document.querySelector('header .meta').innerHTML;
+  const tags = document.querySelector('header .tags').innerHTML;
+  const content = document.querySelector('main').innerHTML;
+  const genTime = document.querySelector('footer').textContent;
+  const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><title>' + title + '</title><style>h1{font-size:18pt} h2{font-size:14pt} p{font-size:11pt} img{max-width:100%}</style></head><body><h1>' + title + '</h1><p>' + meta + '</p><p>' + tags + '</p><hr>' + content + '<hr><p>' + genTime + '</p></body></html>';
   downloadFile(html, title + '.doc', 'application/msword');
 }
 

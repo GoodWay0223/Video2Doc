@@ -2,7 +2,7 @@
 # Extract best audio, convert to MP3, and validate duration
 # Usage: ./extract_audio.sh <VIDEO_FILE> <INFO_JSON> <OUTPUT_MP3>
 
-set -euo pipefail
+set -uo pipefail  # removed -e to prevent premature exit on validation failure
 
 VIDEO_FILE="${1:?Usage: $0 <VIDEO_FILE> <INFO_JSON> <OUTPUT_MP3>}"
 INFO_JSON="${2:?Usage: $0 <VIDEO_FILE> <INFO_JSON> <OUTPUT_MP3>}"
@@ -18,16 +18,22 @@ ffmpeg -i "$VIDEO_FILE" \
     -y \
     "$OUTPUT_MP3" 2>&1 | tail -5
 
+if [[ ! -f "$OUTPUT_MP3" ]]; then
+    echo "ERROR: ffmpeg failed to create $OUTPUT_MP3"
+    exit 1
+fi
+
 # Step 2: Get audio duration from ffprobe
 AUDIO_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUTPUT_MP3")
 echo "Audio duration (ffprobe): ${AUDIO_DUR}s"
 
 # Step 3: Get metadata duration from info.json
+VALID=0
 if [[ -f "$INFO_JSON" ]]; then
     META_DUR=$(python3 -c "import json; print(json.load(open('$INFO_JSON')).get('duration', 0))" 2>/dev/null || echo "0")
     echo "Metadata duration: ${META_DUR}s"
 
-    # Step 4: Compare
+    # Step 4: Compare — wrap in conditional so exit doesn't kill the script
     python3 -c "
 a = float($AUDIO_DUR)
 m = float($META_DUR)
@@ -43,10 +49,11 @@ if diff > 5:
 else:
     print('OK: Duration within acceptable range')
 "
-    VALID=$?
+    if [[ $? -ne 0 ]]; then
+        VALID=1
+    fi
 else
     echo "WARNING: No info.json found, skipping duration validation"
-    VALID=0
 fi
 
 echo ""
