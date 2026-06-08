@@ -33,6 +33,24 @@ header .tag{
   font-size:.78rem;
 }
 
+/* === Export Toolbar === */
+#export-toolbar{
+  position:fixed;top:16px;right:16px;z-index:9999;
+  background:#fff;border:1px solid #e2e8f0;border-radius:8px;
+  padding:8px 12px;box-shadow:0 4px 12px rgba(0,0,0,0.08);
+  display:flex;gap:6px;align-items:center;
+}
+#export-toolbar button{
+  border:none;border-radius:6px;padding:6px 10px;font-size:.8rem;
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+  background:#f8fafc;color:#374151;border:1px solid #e2e8f0;
+}
+#export-toolbar button:hover{background:#e2e8f0}
+#export-toolbar button.primary{
+  background:#2563eb;color:#fff;border-color:#2563eb;
+}
+#export-toolbar button.primary:hover{background:#1d4ed8}
+
 /* === Navigation === */
 nav.toc{
   position:sticky;top:0;z-index:100;
@@ -121,9 +139,11 @@ footer{
 
 /* === Print === */
 @media print{
+  #export-toolbar{display:none!important}
   nav.toc{display:none}
-  body{font-size:12pt}
+  body{font-size:12pt;color:#000}
   .chapter{page-break-inside:avoid}
+  a{color:#000;text-decoration:none}
 }
 
 /* === Responsive === */
@@ -132,10 +152,18 @@ footer{
   header h1{font-size:1.3rem}
   main{padding:1rem .8rem}
   .chapter h2{font-size:1.15rem}
+  #export-toolbar{top:auto;bottom:16px}
 }
 </style>
 </head>
 <body>
+
+<!-- Export Toolbar -->
+<div id="export-toolbar">
+  <button onclick="exportMD()" title="导出 Markdown">📄 MD</button>
+  <button onclick="exportDOCX()" title="导出 Word 文档">📝 DOCX</button>
+  <button onclick="exportScreenshot()" title="导出长截图" class="primary">📸 长截图</button>
+</div>
 
 <header>
   <h1>{TITLE}</h1>
@@ -156,16 +184,17 @@ footer{
 </main>
 
 <footer>
-  由 WorkBuddy Video Deep Doc 自动生成 · {GENERATED_AT}
+  由 Video2Doc 自动生成 · {GENERATED_AT}
 </footer>
 
 <script>
-// Timestamp seek — customize based on whether audio/video is embedded
+// === Timestamp seek ===
 function seekTo(seconds) {
   const target = document.getElementById('ch' + Math.floor(seconds/60));
   if (target) target.scrollIntoView({behavior:'smooth'});
 }
-// Highlight active TOC item on scroll
+
+// === TOC scroll highlight ===
 (function(){
   const toc = document.getElementById('toc');
   if (!toc) return;
@@ -181,7 +210,85 @@ function seekTo(seconds) {
   }, {rootMargin:'-20% 0px -70% 0px'});
   chapters.forEach(c => observer.observe(c));
 })();
+
+// === Export: Markdown ===
+function exportMD() {
+  const title = document.querySelector('header h1').textContent;
+  let md = '# ' + title + '\n\n';
+  const metaSpans = document.querySelectorAll('header .meta span');
+  metaSpans.forEach(s => { md += '> ' + s.textContent + '\n'; });
+  md += '\n---\n\n';
+
+  document.querySelectorAll('.chapter').forEach(ch => {
+    const h2 = ch.querySelector('h2');
+    if (h2) md += '## ' + h2.textContent.replace(/\s+/g, ' ').trim() + '\n\n';
+    const content = ch.querySelector('.content');
+    if (content) {
+      content.querySelectorAll('p,blockquote,figure').forEach(el => {
+        if (el.tagName === 'FIGURE') {
+          const img = el.querySelector('img');
+          const cap = el.querySelector('figcaption');
+          if (img) md += '![' + (cap?.textContent || '') + '](' + img.src + ')\n\n';
+        } else if (el.tagName === 'BLOCKQUOTE') {
+          md += '> ' + el.textContent.replace(/\n/g, '\n> ') + '\n\n';
+        } else {
+          md += el.textContent.trim() + '\n\n';
+        }
+      });
+    }
+  });
+  downloadFile(md, title + '.md', 'text/markdown');
+}
+
+// === Export: DOCX ===
+function exportDOCX() {
+  const title = document.querySelector('header h1').textContent;
+  const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><title>' + title + '</title></head><body>' + document.querySelector('main').innerHTML + '</body></html>';
+  downloadFile(html, title + '.doc', 'application/msword');
+}
+
+// === Export: Long Screenshot ===
+function exportScreenshot() {
+  if (typeof html2canvas !== 'undefined') {
+    const btn = document.querySelector('#export-toolbar button.primary');
+    btn.textContent = '⏳ 生成中...';
+    btn.disabled = true;
+    html2canvas(document.body, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      scrollY: -window.scrollY,
+    }).then(canvas => {
+      canvas.toBlob(blob => {
+        const title = document.querySelector('header h1').textContent;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = title + '.png';
+        a.click();
+        btn.textContent = '📸 长截图';
+        btn.disabled = false;
+      });
+    }).catch(() => {
+      btn.textContent = '📸 长截图';
+      btn.disabled = false;
+      window.print();
+    });
+  } else {
+    window.print();
+  }
+}
+
+// === Helper: download file ===
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob(['\uFEFF' + content], {type: mimeType + ';charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 </body>
 </html>

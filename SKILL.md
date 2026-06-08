@@ -1,19 +1,45 @@
 ---
 name: Video2Doc
-description: "Video2Doc converts videos (Douyin, Bilibili, YouTube) into structured documentation — either a self-contained offline HTML page with chapter analysis, dynamic SVG diagrams, and keyframe screenshots; or a clean transcript with corrected text. Handles downloading, audio extraction with ffprobe validation, 4-tier transcription (TeleSpeechASR → SenseVoiceSmall → Groq → local Whisper), content chaptering, SVG generation, keyframe extraction, and headless verification. Use when the user asks to analyze a video, generate video notes, convert video to document, or provides a video URL for transcription."
+description: "Video2Doc converts videos (Douyin, Bilibili, YouTube) into structured documentation — a clean transcript by default, with optional deep analysis mode that produces a self-contained offline HTML page with chapter analysis, dynamic SVG diagrams, keyframe screenshots, and one-click export to MD/DOCX/long-screenshot. Handles downloading, audio extraction with ffprobe validation, 3-tier transcription (TeleSpeechASR → SenseVoiceSmall → local Whisper), content chaptering, SVG generation, and headless verification."
 agent_created: true
 ---
 
 # Video2Doc — 视频转文档
 
 Convert any video (Douyin/Bilibili/YouTube/etc.) into structured documentation.
-Supports two output modes — the user can ask for either or both:
 
-1. **Full HTML Document** (`index.html`) — self-contained offline page with
-   chapter-by-chapter analysis, dynamic SVG diagrams, and keyframe screenshots.
-2. **Clean Transcript** (`transcript.md`) — Whisper transcription with manual
-   correction of recognition errors, formatted as readable prose with a
-   segment-by-segment correction table.
+---
+
+## First-Run Guide
+
+**When this skill is loaded for the first time (or the user hasn't indicated a
+preference), ALWAYS present this guide before doing anything else:**
+
+```
+## 🎬 Video2Doc — 你的视频转文档助手
+
+我可以帮你把抖音/B站/YouTube 视频转成结构化文档，两种模式可选：
+
+| 模式 | 输出 | 适合 |
+|------|------|------|
+| 📝 **纯文稿**（默认） | 校正后的转录文本 + 逐段对照表 + 要点提炼 | 快速看内容，不需要图表 |
+| 🎨 **深度分析** | 离线 HTML（分章 + SVG 图解 + 关键帧截图），支持一键导出 MD/DOCX/长截图 | 教程、评测、演示类，想留存查阅 |
+
+直接给我一个视频链接就行 👇
+```
+
+**Default behavior**: If the user just says "分析这个视频" without specifying,
+default to **纯文稿** mode. Only switch to deep analysis if they explicitly
+ask for "深度分析" or "完整分析" or "生成 HTML".
+
+Supported output modes:
+
+1. **Clean Transcript** (`transcript.md`) — **DEFAULT**. Whisper transcription
+   with manual correction of recognition errors, formatted as readable prose
+   with a segment-by-segment correction table.
+2. **Full HTML Document** (`index.html`) — self-contained offline page with
+   chapter-by-chapter analysis, dynamic SVG diagrams, keyframe screenshots,
+   and built-in export buttons (MD, DOCX, long screenshot).
 
 ---
 
@@ -127,26 +153,14 @@ cloud API if a key is configured.
 
 ### Mode A: Cloud API (Recommended)
 
-Fast, no local compute, no model download. Three tiers:
+Fast, no local compute, no model download. Two tiers:
 
 | Priority | Provider | Register | Free Tier | Model | Notes |
 |----------|----------|----------|-----------|-------|-------|
 | **1st** | 硅基流动 | https://siliconflow.cn | 10h/month | TeleSpeechASR | Chinese-optimized, no emoji, best accuracy |
 | **2nd** | 硅基流动 | https://siliconflow.cn | 10h/month | SenseVoiceSmall | Has emoji noise, post-process required |
-| **3rd** | Groq | https://console.groq.com | 8h/day, 2000 req/day | whisper-large-v3-turbo | Rich timestamps, non-Chinese |
 
 Both use the same OpenAI-compatible API. Request format:
-
-```bash
-curl https://api.groq.com/openai/v1/audio/transcriptions \
-  -H "Authorization: Bearer $API_KEY" \
-  -F "file=@audio.mp3" \
-  -F "model=whisper-large-v3-turbo" \
-  -F "response_format=verbose_json" \
-  -F "language=zh"
-```
-
-For 硅基流动, swap the endpoint:
 
 ```bash
 curl https://api.siliconflow.cn/v1/audio/transcriptions \
@@ -188,8 +202,7 @@ key. Store it as `GROQ_API_KEY` or `SILICONFLOW_API_KEY` env var / config.
 1. **TeleSpeechASR** — use for all Chinese content. Best accuracy, no emoji noise.
 2. **SenseVoiceSmall** — fallback if TeleSpeechASR fails or for A/B comparison.
    Always post-process with `emoji.replace_emoji()` to strip emoji.
-3. **Groq Whisper** — use for non-Chinese content or when rich timestamps needed.
-4. **Local Whisper** — last resort when no API key is configured, or user
+3. **Local Whisper** — last resort when no API key is configured, or user
    explicitly prefers offline transcription (privacy, no network).
 
 ### Mode B: Local Whisper (Fallback)
@@ -400,9 +413,11 @@ Generate a single, self-contained HTML file.
   <title>【视频深度分析】{标题} — {UP主}</title>
   <style>
     /* All CSS inline — see styling guidelines below */
+    /* Must include @media print rules for export */
   </style>
 </head>
 <body>
+  <div id="export-toolbar">  <!-- Sticky export buttons: MD / DOCX / 长截图 --> </div>
   <header>  <!-- Video metadata: title, uploader, duration, tags --> </header>
   <nav>     <!-- Chapter TOC with jump links -->                    </nav>
   <main>
@@ -411,8 +426,9 @@ Generate a single, self-contained HTML file.
     <!-- ... -->
   </main>
   <footer>  <!-- Generation timestamp, tool versions -->            </footer>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script>
-    /* Minimal JS for timestamp seek, if embedding video/audio */
+    /* Export functions: exportMD(), exportDOCX(), exportScreenshot() */
   </script>
 </body>
 </html>
@@ -435,6 +451,51 @@ Generate a single, self-contained HTML file.
 
 Generate a sticky or collapsible table of contents with anchor links to each
 chapter section.
+
+### Export Toolbar
+
+Every deep-analysis HTML page MUST include a sticky export toolbar at the
+top-right corner with the following buttons:
+
+| Button | Action | Implementation |
+|--------|--------|----------------|
+| 📄 **导出 MD** | Download content as Markdown | `Blob` + `<a download>` with all chapter text and image paths |
+| 📝 **导出 DOCX** | Download as Word document | Generate a simple HTML→DOCX (Word can open `.doc` with HTML content) |
+| 📸 **长截图** | Capture full-page PNG | Use `html2canvas` or browser's built-in `window.print()` with `@media print` CSS, or trigger a `Ctrl+P` dialog |
+
+**Implementation pattern** for the toolbar:
+
+```html
+<div id="export-toolbar" style="position:fixed;top:16px;right:16px;z-index:9999;
+  background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);display:flex;gap:8px;">
+  <button onclick="exportMD()" title="导出 Markdown">📄 MD</button>
+  <button onclick="exportDOCX()" title="导出 Word 文档">📝 DOCX</button>
+  <button onclick="exportScreenshot()" title="导出长截图" style="background:#2563eb;color:#fff;">📸 长截图</button>
+</div>
+```
+
+**Export MD**: Collect all `<section class="chapter">` content, convert to
+Markdown format preserving headings, timestamps, figure captions.
+
+**Export DOCX**: Wrap the content in a minimal HTML document that Microsoft
+Word can open natively (Word opens `.doc` files with HTML content). Use
+`application/msword` MIME type for download.
+
+**Long screenshot**: Use `html2canvas` CDN to capture the full page. If
+html2canvas is unavailable, fall back to `window.print()` with dedicated
+`@media print` styles that produce a clean PDF/A4 output.
+
+**@media print rules** required in the CSS:
+```css
+@media print {
+  #export-toolbar { display: none !important; }
+  nav { display: none !important; }
+  .chapter { break-inside: avoid; }
+  body { font-size: 12pt; color: #000; }
+  a { color: #000; text-decoration: none; }
+}
+```
 
 ---
 
