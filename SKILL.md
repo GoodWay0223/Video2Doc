@@ -25,8 +25,40 @@ preference), ALWAYS present this guide before doing anything else:**
 | 📝 **纯文稿**（默认） | 校正后的转录文本 + 逐段对照表 + 要点提炼 | 快速看内容，不需要图表 |
 | 🎨 **深度分析** | 离线 HTML（分章 + SVG 图解 + 关键帧截图），支持一键导出 MD/DOCX/长截图 | 教程、评测、演示类，想留存查阅 |
 
-直接给我一个视频链接就行 👇
+在开始之前，需要先配置语音转录引擎。两种选择：
+- ☁️ **云端（推荐）**：硅基流动免费 API，速度快、精度高、不占本机算力
+- 💻 **本地**：使用 Whisper 在本机运行，完全离线，但需下载 1.5GB 模型
+
+你已经有硅基流动 API Key 了吗？还是需要我引导注册？
 ```
+
+**After presenting the guide, proceed to the transcription setup flow below.**
+
+### Transcription Setup Flow
+
+**Step 1: Check if API key exists.** Look in `~/.workbuddy/MEMORY.md` for
+`SILICONFLOW_API_KEY`. If found, skip to "ready" state.
+
+**Step 2: If no key found, ask the user:**
+
+```
+语音转录需要硅基流动 API（免费，每月 10 小时）。你有 API Key 吗？
+
+- 选项 A：我已有 Key → 直接提供给我
+- 选项 B：帮我注册 → 打开 https://cloud.siliconflow.cn/i/pWcvZzOr 注册后在"API 密钥"页面创建一个 Key 给我
+- 选项 C：用本地 Whisper → 大模型下载 + CPU 推理（较慢但完全离线）
+```
+
+**Step 3: Store the key.** When the user provides a key, store it:
+```
+→ Edit ~/.workbuddy/MEMORY.md, append:
+  ## SiliconFlow API Key
+  SILICONFLOW_API_KEY: sk-xxxxxxxxxxxx
+  (Auto-configured by Video2Doc skill)
+```
+
+**Step 4: Confirm ready.** Once key is stored or user chooses local, confirm and
+proceed to accept video links.
 
 **Default behavior**: If the user just says "分析这个视频" without specifying,
 default to **纯文稿** mode. Only switch to deep analysis if they explicitly
@@ -230,8 +262,8 @@ cleaned = replace_emoji(raw_text, replace="")
 **Recommendation**: Prefer `TeleAI/TeleSpeechASR` for Chinese — it has better
 accuracy AND doesn't output emoji. Only use SenseVoiceSmall for comparison.
 
-**API key storage**: Check `~/.workbuddy/MEMORY.md` or ask the user for their
-key. Store it as `SILICONFLOW_API_KEY` env var / config.
+**API key storage**: Stored in `~/.workbuddy/MEMORY.md` as `SILICONFLOW_API_KEY`.
+If not found, go back to First-Run Guide → Transcription Setup Flow.
 
 **Provider selection logic (ordered by priority)**:
 1. **TeleSpeechASR** — use for all Chinese content. Best accuracy, no emoji noise.
