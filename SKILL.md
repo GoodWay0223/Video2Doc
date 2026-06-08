@@ -588,3 +588,24 @@ which yt-dlp ffmpeg ffprobe
 ```
 
 For cloud API, check keys are set as environment variables or in project config.
+
+---
+
+## Versioning & Release
+
+This skill follows [Semantic Versioning](https://semver.org/). Releases are
+packaged as `Video2Doc-v{MAJOR}.{MINOR}.{PATCH}.zip` and published to GitHub.
+
+**Release workflow** (run after any SKILL.md or script change):
+```bash
+cd ~/.workbuddy/skills/Video2Doc
+VERSION=v0.1.0  # bump as needed
+git add -A && git commit -m "feat: description" && git push
+git tag -a $VERSION -m "Video2Doc $VERSION" && git push origin $VERSION
+# Then create GitHub Release with zip asset
+```
+
+After releasing, the agent should confirm:
+- [ ] Tag pushed to GitHub
+- [ ] Release created with `Video2Doc-{VERSION}.zip` asset
+- [ ] CHANGELOG.md updated
