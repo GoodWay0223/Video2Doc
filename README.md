@@ -1,6 +1,6 @@
 # Video2Doc
 
-> 一个 AI Agent Skill——让任意 AI 助手将视频（抖音/B站/YouTube）转化为结构化文档。
+> 一个 AI Agent Skill——让任意 AI 助手将视频（抖音/小红书/B站/YouTube）转化为结构化文档。
 
 ## 这是什么
 
@@ -27,7 +27,7 @@ Video2Doc 是一个 **AI Agent Skill**，定义了从视频到文档的完整工
 
 ## 功能
 
-- **多平台支持**：抖音、B站、YouTube
+- **多平台支持**：抖音、小红书、B站、YouTube
 - **三级智能转录**：TeleSpeechASR（首选）→ SenseVoiceSmall → 本地 Whisper
 - **内容分析**：按视频自然结构分章，提炼问题/陷阱/步骤/结论
 - **SVG 图解**：按内容类型动态生成（流程/关系/时间线/对比/决策树/因果链）

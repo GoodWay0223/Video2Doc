@@ -1,12 +1,12 @@
 ---
 name: Video2Doc
-description: "Video2Doc converts videos (Douyin, Bilibili, YouTube) into structured documentation — a clean transcript by default, with optional deep analysis mode that produces a self-contained offline HTML page with chapter analysis, dynamic SVG diagrams, keyframe screenshots, and one-click export to MD/DOCX/long-screenshot. Handles downloading, audio extraction with ffprobe validation, 3-tier transcription (TeleSpeechASR → SenseVoiceSmall → local Whisper), content chaptering, SVG generation, and headless verification."
+description: "Video2Doc converts videos (Douyin, Xiaohongshu, Bilibili, YouTube) into structured documentation — a clean transcript by default, with optional deep analysis mode that produces a self-contained offline HTML page with chapter analysis, dynamic SVG diagrams, keyframe screenshots, and one-click export to MD/DOCX/long-screenshot. Handles downloading, audio extraction with ffprobe validation, 3-tier transcription (TeleSpeechASR → SenseVoiceSmall → local Whisper), content chaptering, SVG generation, and headless verification."
 agent_created: true
 ---
 
 # Video2Doc — 视频转文档
 
-Convert any video (Douyin/Bilibili/YouTube/etc.) into structured documentation.
+Convert any video (Douyin/Xiaohongshu/Bilibili/YouTube) into structured documentation.
 
 ---
 
@@ -18,7 +18,7 @@ preference), ALWAYS present this guide before doing anything else:**
 ```
 ## 🎬 Video2Doc — 你的视频转文档助手
 
-我可以帮你把抖音/B站/YouTube 视频转成结构化文档，两种模式可选：
+我可以帮你把抖音/小红书/B站/YouTube 视频转成结构化文档，两种模式可选：
 
 | 模式 | 输出 | 适合 |
 |------|------|------|
@@ -63,6 +63,7 @@ logged-in quality, etc.).
 ```bash
 yt-dlp \
   --cookies-from-browser chrome \
+  --add-header "Referer:https://www.xiaohongshu.com/" \  # required for Xiaohongshu
   --write-info-json \
   --write-thumbnail \
   --write-subs \
@@ -80,7 +81,7 @@ yt-dlp \
   containing title, uploader, description, tags, duration, chapters, and
   multi-part (分P) info. Parse this file to extract all metadata.
 - **Platform-specific**: For Bilibili, add `--parse-metadata "description:%(description)s"`.
-  For Douyin, the cookie file is often mandatory.
+  For Douyin and Xiaohongshu, cookies are mandatory.
 - **Output naming**: Keep the video ID in the filename for traceability.
 
 After download, read the `.info.json` file and extract:
@@ -196,7 +197,7 @@ cleaned = replace_emoji(raw_text, replace="")
 accuracy AND doesn't output emoji. Only use SenseVoiceSmall for comparison.
 
 **API key storage**: Check `~/.workbuddy/MEMORY.md` or ask the user for their
-key. Store it as `GROQ_API_KEY` or `SILICONFLOW_API_KEY` env var / config.
+key. Store it as `SILICONFLOW_API_KEY` env var / config.
 
 **Provider selection logic (ordered by priority)**:
 1. **TeleSpeechASR** — use for all Chinese content. Best accuracy, no emoji noise.
@@ -624,6 +625,21 @@ Correction rules for Chinese transcription:
 - `ffmpeg` must be in `PATH` for Whisper to work. If using a custom
   ffmpeg binary, add its directory to `PATH` before running Whisper.
 
+### Xiaohongshu (小红书)
+
+- Cookies are mandatory. Use `--cookies-from-browser chrome` or a cookies.txt.
+- **Referer header is critical**: always add `--add-header "Referer:https://www.xiaohongshu.com/"`.
+- **M3U8 streams**: Many Xiaohongshu videos use HLS/M3U8 segmented streaming.
+  yt-dlp handles this natively but may need `--concurrent-fragments 5` for speed.
+- **Watermark**: Default download includes watermark. To get watermark-free,
+  look for the `source` or `origin` video stream in the page HTML.
+- **Playwright fallback**: If yt-dlp fails (common due to API changes):
+  1. Open the video page in Playwright with cookies injected
+  2. Wait for video element to load
+  3. Extract `document.querySelector('video').src`
+  4. Download with curl + cookies + Referer header
+- Short video format (< 5 min) — skip parallel shard extraction.
+
 ### YouTube
 
 - `yt-dlp` works without cookies for public videos.
@@ -638,7 +654,7 @@ Correction rules for Chinese transcription:
 |------|---------|----------|
 | `yt-dlp` | Video download | Always |
 | `ffmpeg` + `ffprobe` | Audio/video processing | Always |
-| Groq / 硅基流动 API Key | Cloud transcription (recommended) | Either one |
+| 硅基流动 API Key | Cloud transcription (recommended) | Cloud mode |
 | `whisper` (local) | Fallback transcription | Only if no API key |
 | Chrome/Chromium | Headless verification | Optional |
 
