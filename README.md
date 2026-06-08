@@ -1,4 +1,4 @@
-# video2doc
+# Video2Doc
 
 将视频（抖音/B站/YouTube）转化为结构化深度文档——支持纯文稿和完整 HTML 两种输出模式。
 
@@ -48,7 +48,7 @@
 ## 结构
 
 ```
-video2doc/
+Video2Doc/
 ├── SKILL.md                  # 主工作流（8 阶段完整指南）
 ├── README.md                 # 本文件
 ├── scripts/                  # 可执行辅助脚本

@@ -1,10 +1,10 @@
 ---
-name: video2doc
-description: "video2doc converts videos (Douyin, Bilibili, YouTube) into structured documentation — either a self-contained offline HTML page with chapter analysis, dynamic SVG diagrams, and keyframe screenshots; or a clean transcript with corrected text. Handles downloading, audio extraction with ffprobe validation, 4-tier transcription (TeleSpeechASR → SenseVoiceSmall → Groq → local Whisper), content chaptering, SVG generation, keyframe extraction, and headless verification. Use when the user asks to analyze a video, generate video notes, convert video to document, or provides a video URL for transcription."
+name: Video2Doc
+description: "Video2Doc converts videos (Douyin, Bilibili, YouTube) into structured documentation — either a self-contained offline HTML page with chapter analysis, dynamic SVG diagrams, and keyframe screenshots; or a clean transcript with corrected text. Handles downloading, audio extraction with ffprobe validation, 4-tier transcription (TeleSpeechASR → SenseVoiceSmall → Groq → local Whisper), content chaptering, SVG generation, keyframe extraction, and headless verification. Use when the user asks to analyze a video, generate video notes, convert video to document, or provides a video URL for transcription."
 agent_created: true
 ---
 
-# video2doc — 视频转文档
+# Video2Doc — 视频转文档
 
 Convert any video (Douyin/Bilibili/YouTube/etc.) into structured documentation.
 Supports two output modes — the user can ask for either or both:
