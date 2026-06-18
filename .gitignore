@@ -2,3 +2,23 @@
 *.pyc
 __pycache__/
 .playwright-cli/
+
+# Sensitive files — NEVER commit
+cookies.txt
+playwright_state.json
+*.key
+.env
+
+# Runtime media files
+*.mp3
+*.mp4
+*.wav
+*.webm
+*.m4a
+
+# Generated output
+raw/
+audio/
+output/
+verify/
+images/

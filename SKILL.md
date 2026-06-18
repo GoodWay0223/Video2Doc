@@ -1,12 +1,30 @@
 ---
 name: Video2Doc
-description: "Video2Doc converts videos (Douyin, Xiaohongshu, Bilibili, YouTube) into structured documentation — a clean transcript by default, with optional deep analysis mode that produces a self-contained offline HTML page with chapter analysis, dynamic SVG diagrams, keyframe screenshots, and one-click export to MD/DOCX/long-screenshot. Handles downloading, audio extraction with ffprobe validation, 3-tier transcription (TeleSpeechASR → SenseVoiceSmall → local Whisper), content chaptering, SVG generation, and headless verification."
+description: "Video2Doc converts videos (Douyin, Xiaohongshu, Bilibili, YouTube) into structured documentation — a clean transcript by default, with optional deep analysis mode. Handles downloading (yt-dlp + Playwright MediaRecorder with anti-bot strategy), one-step audio extraction, 3-tier transcription (TeleSpeechASR cloud API → SenseVoiceSmall → local Whisper), content chaptering, SVG generation, and parallel batch processing for multiple videos."
 agent_created: true
 ---
 
 # Video2Doc — 视频转文档
 
 Convert any video (Douyin/Xiaohongshu/Bilibili/YouTube) into structured documentation.
+
+---
+
+## 🔒 Security & Privacy
+
+**This Skill does NOT ship with any cookies, API keys, or credentials.**
+
+- **Cookies**: Douyin/XHS require cookies for download. Each user must provide
+  their own `cookies.txt` exported from their browser. The `.gitignore` blocks
+  `cookies.txt`, `playwright_state.json`, and all runtime media files from
+  ever being committed.
+- **API Keys**: SiliconFlow key is stored in `~/.workbuddy/MEMORY.md` (local, per-user,
+  never committed). The SKILL.md only references the key via lookup — no key is
+  hardcoded.
+- **All runtime files** (`*.mp4`, `*.mp3`, `raw/`, `output/`, etc.) are gitignored.
+
+When you share this Skill repo, recipients get only the workflow logic. They
+must supply their own cookies and API keys.
 
 ---
 
@@ -109,6 +127,33 @@ ffmpeg -i video.mp4 -map 0:s:0 output.srt
 
 Proceed phase by phase. If any phase fails, diagnose and retry before moving on.
 
+### 🚀 Parallel Processing Strategy (Batch Mode)
+
+When processing **multiple videos**, run phases in parallel for maximum speed:
+
+```
+VIDEO 1: Phase 1 (download) → Phase 2 (audio) → Phase 3 (transcribe) → Phase 4 (output)
+VIDEO 2: Phase 1 (download) → Phase 2 (audio) → Phase 3 (transcribe) → Phase 4 (output)
+          └── start while video1 is transcribing ──┘
+```
+
+**Key rule**: Download + audio extraction of video N can start while video N-1
+is being transcribed by TeleSpeechASR (cloud API, non-blocking). This
+parallelizes the slowest phase (download is real-time for MediaRecorder).
+
+**DO NOT parallelize within a single video** — transcription depends on audio,
+which depends on download. But different videos are independent.
+
+### ⏱️ Time Estimates (per video, single-threaded)
+
+| Video Length | Download (MediaRecorder) | Audio Extract | Transcribe (TeleSpeechASR) | Total |
+|-------------|--------------------------|---------------|---------------------------|-------|
+| 1 min | ~60s | ~3s | ~5s | **~70s** |
+| 3 min | ~180s | ~5s | ~8s | **~195s** |
+| 10 min | ~600s | ~10s | ~15s | **~625s** |
+
+With parallel batch processing (N videos): ~60s + N × 8s (transcription overlaps download).
+
 ---
 
 ## Phase 1: Download Video with Full Metadata
@@ -154,12 +199,12 @@ After download, read the `.info.json` file and extract:
 
 ---
 
-## Phase 2: Audio Extraction, Conversion, and Validation
+## Phase 2: Audio Extraction and Validation
 
-Extract the best audio stream, convert to MP3, and validate duration against
-the metadata.
+Extract audio directly as MP3 in one step (skip WAV intermediate). Validate
+duration against ffprobe (no metadata JSON needed for most platforms).
 
-### Step 1: Extract and Convert
+### Step 1: Extract Audio (One-Step)
 
 ```bash
 ffmpeg -i "<VIDEO_FILE>" \
@@ -172,28 +217,28 @@ ffmpeg -i "<VIDEO_FILE>" \
 
 - `-vn` — discard video stream
 - `-q:a 2` — VBR quality 2 (≈190 kbps, excellent for transcription)
-- Use `-ac 1` for mono if transcript quality is more important than fidelity
+- One step from video → MP3. No need to extract WAV first.
+- For mono-only optimization (slightly smaller file): add `-ac 1`
 
 ### Step 2: Validate Duration
 
 ```bash
 AUDIO_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "<OUTPUT>.mp3")
-```
+VIDEO_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "<VIDEO_FILE>")
 
-```bash
-META_DUR=$(python3 -c "import json; d=json.load(open('<INFO_JSON>')); print(d['duration'])")
-```
-
-```bash
 python3 -c "
 a = float($AUDIO_DUR)
-m = float($META_DUR)
-diff = abs(a - m) / m
-print(f'Audio: {a:.1f}s, Metadata: {m:.1f}s, Diff: {diff*100:.1f}%')
+v = float($VIDEO_DUR)
+diff = abs(a - v) / v
+print(f'Audio: {a:.1f}s, Video: {v:.1f}s, Diff: {diff*100:.1f}%')
 if diff > 0.05:
     print('WARNING: Duration discrepancy exceeds 5%')
 "
 ```
+
+Note: Use ffprobe on the video file directly instead of parsing .info.json
+(yt-dlp doesn't produce .info.json for MediaRecorder downloads). This is both
+faster and more reliable.
 
 ### Step 3: Decision
 
@@ -694,21 +739,124 @@ Correction rules for Chinese transcription:
 - Subtitles (弹幕): use `--write-subs --sub-langs all` to capture CC
   subtitles; Danmaku (弹幕) is not supported by yt-dlp directly.
 
-### Douyin (抖音)
+### Douyin (抖音) — CRITICAL: Anti-Bot Strategy
 
-- Cookies are mandatory for most videos.
-- **yt-dlp frequently fails** for Douyin due to API anti-bot protection ("Fresh
-  cookies needed" or "Failed to parse JSON"). The recommended fallback:
-  1. Use Playwright (`playwright-cli`) to open the video page with cookies
-     injected via `cookie-set`.
-  2. Wait for the video player to load (~5-8 seconds).
-  3. Extract the video URL via `eval "document.querySelector('video').src"`.
-  4. Download the video with `curl` using the same cookies file.
-  This approach bypasses yt-dlp's broken API calls entirely.
-- Short video format (< 5 min) — skip parallel shard extraction, just
-  extract one frame directly.
-- `ffmpeg` must be in `PATH` for Whisper to work. If using a custom
-  ffmpeg binary, add its directory to `PATH` before running Whisper.
+Douyin aggressively detects headless browsers. The following strategy is
+**battle-tested** across multiple downloads.
+
+#### ⚠️ Gold Rules for Douyin Download
+
+1. **NEVER reuse a browser session** after it's been flagged (captcha page).
+   Always `playwright-cli close` and `open` fresh for each video.
+2. **Load cookies FIRST, then navigate.** Do NOT navigate before cookies are set.
+   Navigating without cookies triggers bot detection that persists for the session.
+3. **ONE video per browser session.** After download, immediately close the browser.
+4. **Detect captcha early.** If page title contains "验证码", abort immediately and
+   retry with a fresh session after 30s delay.
+
+#### Download Strategy (ordered by reliability)
+
+**Tier 1: MediaRecorder (most reliable, ~video_duration seconds)**
+
+This approach bypasses ALL bot detection because it records the video as it plays:
+```bash
+# Step 1: Set up cookies via state-load (load BEFORE navigating)
+playwright-cli open --browser=chrome
+playwright-cli state-load playwright_state.json
+
+# Step 2: Navigate to video page
+playwright-cli goto "https://www.douyin.com/video/VIDEO_ID"
+
+# Step 3: Check for captcha — if page title is "验证码中间页", ABORT + retry
+# Step 4: Use eval to start MediaRecorder
+playwright-cli eval "
+(async () => {
+  const video = document.querySelector('video');
+  if (!video) return 'NO_VIDEO';
+  video.muted = false;
+  video.play();
+  const stream = video.captureStream();
+  const chunks = [];
+  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'video.webm';
+    a.click();
+  };
+  recorder.start();
+  await new Promise(r => video.onended = r);
+  recorder.stop();
+  await new Promise(r => setTimeout(r, 500));
+  return 'DONE';
+})()
+"
+
+# Step 5: Copy downloaded file
+cp .playwright-cli/video.webm vN/raw/video.mp4
+```
+
+**Tier 2: page.route interception (faster, but browser fingerprint must match)**
+
+If MediaRecorder is too slow (video > 3min), try intercepting the video URL
+from network requests:
+```bash
+playwright-cli eval "
+  window.__videoUrl = null;
+  // Scan existing script tags for video URLs
+  document.querySelectorAll('script').forEach(s => {
+    if (s.textContent) {
+      const m = s.textContent.match(/https?:\\/\\/[^\\\"\\\\s]+\\\\.(mp4|m3u8)[^\\\"\\\\s]*/);
+      if (m) window.__videoUrl = m[0];
+    }
+  });
+  window.__videoUrl || document.querySelector('video')?.src || 'NOT_FOUND'
+"
+# Then download with curl (cookies MUST match)
+```
+
+**Tier 3: yt-dlp (rarely works for Douyin)**
+Only try if both Tier 1 and Tier 2 fail. Known failure: "Fresh cookies needed",
+"Failed to parse JSON".
+
+#### Speed Tips for Douyin
+
+- **MediaRecorder** = real-time (video duration = download time). For a 60s video,
+  this is 60s. Accept this — it's the price of reliability.
+- **Batch multiple videos**: download video2 while transcribing video1 (parallel).
+- **Skip unnecessary wait**: replace `sleep(5)` with `page.waitForSelector('video')`.
+- **Short videos (< 2min)**: MediaRecorder is fast enough, no need for Tier 2.
+
+#### Cookie Management
+
+- Export fresh cookies.txt before each session. Douyin cookies expire quickly (1-2 hours).
+- Convert cookies.txt to Playwright state JSON with this Python snippet:
+  ```python
+  import json
+  cookies = []
+  with open('cookies.txt') as f:
+      for line in f:
+          if line.startswith('#') or not line.strip(): continue
+          parts = line.strip().split('\t')
+          if len(parts) >= 7:
+              cookies.append({'name': parts[5], 'value': parts[6],
+                  'domain': parts[0], 'path': parts[2],
+                  'secure': parts[3]=='TRUE', 'httpOnly': False, 'sameSite': 'Lax'})
+  json.dump({'cookies': cookies}, open('playwright_state.json', 'w'))
+  ```
+- **Important**: Cookies MUST have `sameSite: 'Lax'` — without it, Playwright
+  may not send cookies correctly, triggering captcha.
+
+#### Error Recovery
+
+| Error | Action |
+|-------|--------|
+| Page title = "验证码中间页" | Close browser, wait 30s, new session, retry (max 3x) |
+| `NO_VIDEO` from eval | Check if page loaded correctly; try longer wait |
+| MediaRecorder produces 0-byte file | Video element may be DRM-protected — skip this video |
+| yt-dlp "Fresh cookies needed" | Cookies expired — need re-export from browser |
 
 ### Xiaohongshu (小红书)
 
