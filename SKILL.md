@@ -18,9 +18,7 @@ Convert any video (Douyin/Xiaohongshu/Bilibili/YouTube) into structured document
   their own `cookies.txt` exported from their browser. The `.gitignore` blocks
   `cookies.txt`, `playwright_state.json`, and all runtime media files from
   ever being committed.
-- **API Keys**: SiliconFlow key is stored in `~/.workbuddy/MEMORY.md` (local, per-user,
-  never committed). The SKILL.md only references the key via lookup — no key is
-  hardcoded.
+- **API Keys**: SiliconFlow key is read from 3 sources in order: `SILICONFLOW_API_KEY` env var (recommended) → `~/.video2doc/config.json` (cross-Agent) → `~/.workbuddy/MEMORY.md` (legacy). No key is hardcoded.
 - **All runtime files** (`*.mp4`, `*.mp3`, `raw/`, `output/`, etc.) are gitignored.
 
 When you share this Skill repo, recipients get only the workflow logic. They
@@ -307,7 +305,19 @@ cleaned = replace_emoji(raw_text, replace="")
 **Recommendation**: Prefer `TeleAI/TeleSpeechASR` for Chinese — it has better
 accuracy AND doesn't output emoji. Only use SenseVoiceSmall for comparison.
 
-**API key storage**: Stored in `~/.workbuddy/MEMORY.md` as `SILICONFLOW_API_KEY`.
+**API key storage** (cross-Agent, 3 sources checked in priority order):
+
+1. **Environment variable** `SILICONFLOW_API_KEY` (recommended, works in any Agent)
+   ```bash
+   export SILICONFLOW_API_KEY=sk-xxxxx
+   ```
+2. **Cross-Agent config** `~/.video2doc/config.json` (machine-wide, Agent-agnostic)
+   ```json
+   {"siliconflow_api_key": "sk-xxxxx"}
+   ```
+3. **WorkBuddy legacy** `~/.workbuddy/MEMORY.md` (auto-detected for backward compatibility)
+
+Scripts source `scripts/load_config.sh` to load the key from any of these sources.
 If not found, go back to First-Run Guide → Transcription Setup Flow.
 
 **Provider selection logic (ordered by priority)**:
@@ -893,14 +903,46 @@ Only try if both Tier 1 and Tier 2 fail. Known failure: "Fresh cookies needed",
 | Playwright CLI | Douyin/XHS video URL extraction | Douyin/XHS scenarios |
 | Chrome/Chromium | Headless verification | Optional (deep analysis mode) |
 
-Check tool availability:
-
+One-command check:
 ```bash
-which yt-dlp ffmpeg ffprobe
-pip show emoji openai-whisper 2>/dev/null
+bash scripts/check_setup.sh
 ```
 
-For cloud API, check keys are set as environment variables or in project config.
+For cloud API, source `scripts/load_config.sh` (env var → ~/.video2doc/config.json → WorkBuddy legacy).
+
+---
+
+## CLI & Scripts
+
+### Entry Point: `video2doc.sh`
+
+```bash
+# Single video → transcript
+./video2doc.sh "https://v.douyin.com/xxxx"
+
+# Batch mode (one link per line in links.txt)
+./video2doc.sh --batch links.txt --format srt,md
+
+# With domain corrections applied automatically
+./video2doc.sh --domain auto "https://v.douyin.com/xxxx" --format all
+
+# Dry-run (check what would happen)
+./video2doc.sh --dry-run --batch links.txt
+```
+
+### Utility Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/check_setup.sh` | Environment health check (all deps + API key) |
+| `scripts/load_config.sh` | Cross-Agent API key loader (source to get `$SILICONFLOW_API_KEY`) |
+| `scripts/export_formats.py` | Convert TeleSpeechASR output → SRT/TXT/JSON/MD |
+| `scripts/apply_corrections.py` | Apply `references/corrections.json` rules to fix ASR errors |
+| `scripts/download_video.sh` | yt-dlp download + metadata |
+| `scripts/extract_audio.sh` | Audio extraction + ffprobe validation |
+| `scripts/transcribe.sh` | Whisper transcription + validation |
+| `scripts/extract_frames.sh` | Parallel keyframe extraction |
+| `scripts/verify_html.py` | Chrome headless HTML verification |
 
 ---
 

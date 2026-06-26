@@ -1,0 +1,77 @@
+{
+  "version": "0.1.0",
+  "description": "Transcription correction rules. Applied in order: exact → context → fuzzy.",
+  "rules": {
+    "exact": [
+      {"from": "badcase", "to": "Bad Case"},
+      {"from": "Bad case", "to": "Bad Case"},
+      {"from": "评测机", "to": "评测集"},
+      {"from": "依次解决率", "to": "一次解决率"},
+      {"from": "感知行", "to": "感知型"},
+      {"from": "亮效", "to": "亮相"},
+      {"from": "淋巴车油", "to": "08车友"},
+      {"from": "极光引", "to": "极光银"},
+      {"from": "耀瑞银", "to": "耀日银"},
+      {"from": "101lp", "to": "01 LP", "caseSensitive": true},
+      {"from": "a4 around", "to": "A4 Allroad", "caseSensitive": true},
+      {"from": "mrc电磁悬架", "to": "MRC 电磁悬架"},
+      {"from": "07gt", "to": "07 GT", "caseSensitive": true},
+      {"from": "ai产品", "to": "AI 产品", "caseSensitive": true},
+      {"from": "ai客服", "to": "AI 客服", "caseSensitive": true},
+      {"from": "ai产品经理", "to": "AI 产品经理", "caseSensitive": true}
+    ],
+    "context": [
+      {
+        "from": "零七",
+        "to": "07",
+        "contextBefore": "领克",
+        "contextAfter": "轿车|GT",
+        "note": "领克品牌内 07 应数字化，非品牌名不使用此规则"
+      },
+      {
+        "from": "顶盒",
+        "to": "领克",
+        "contextBefore": "劝你一句",
+        "contextAfter": "|千万不要|别",
+        "note": "口播中'领克'误识别为'顶盒'，仅在劝告语境中使用"
+      }
+    ],
+    "fuzzy": [
+      {
+        "from_pattern": "帕米尔\\s*兰\\s*纳米\\s*米亚\\s*黄",
+        "to": "帕米尔蓝 / 纳米亚黄",
+        "note": "TeleSpeechASR 将多个车漆名合并，需人工确认"
+      },
+      {
+        "from_pattern": "(\\d+)百公里",
+        "to": "$1公里",
+        "note": "口语'200百公里'→'200公里'"
+      }
+    ]
+  },
+  "domains": {
+    "auto": {
+      "description": "汽车/车评领域专用规则，仅在视频属于汽车类别时启用",
+      "exact": [
+        {"from": "淋巴", "to": "08", "contextAfterRule": "车友|车主|群"},
+        {"from": "零三", "to": "03"},
+        {"from": "电悬", "to": "电磁悬架"},
+        {"from": "四驴", "to": "四驱"},
+        {"from": "全属", "to": "专属"}
+      ],
+      "context": [
+        {"from": "大耦", "to": "大尾翼", "contextBefore": "碳纤维"},
+        {"from": "哑光博览灰", "to": "哑光博朗灰", "note": "车漆名，发音接近"}
+      ]
+    },
+    "tech": {
+      "description": "科技/产品领域专用规则",
+      "exact": [
+        {"from": "产品经理抽case", "to": "产品经理抽 Case"},
+        {"from": "bad case", "to": "Bad Case"},
+        {"from": "评测及", "to": "评测集"},
+        {"from": "回流机制是", "to": "回流机制是"}
+      ]
+    }
+  }
+}

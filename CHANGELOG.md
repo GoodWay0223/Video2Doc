@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.2.0] — 2026-06-26
+
+### Added
+- **`check_setup.sh`**: 一键环境自检脚本，彩色输出检测所有依赖
+- **`load_config.sh`**: 跨 Agent 配置加载，优先级 env var > ~/.video2doc/config.json > WorkBuddy legacy
+- **`corrections.json`**: 转录校正规则库（通用规则 + 汽车/科技领域规则）
+- **`apply_corrections.py`**: 自动应用校正规则（精确匹配 + 上下文匹配 + 模糊正则）
+- **`export_formats.py`**: 多格式导出（SRT 字幕 / JSON 结构化 / TXT 纯文本 / MD）
+- **`video2doc.sh`**: CLI 入口脚本，支持单视频、批量模式、自定义格式、领域校正
+
+### Changed
+- API Key 读取不再绑定 WorkBuddy，新增环境变量和 config.json 两种跨 Agent 方案
+- README 重写：新增快速开始、配置指南、CLI 用法
+- SKILL.md 新增 CLI & Scripts 章节
+
 ## [v0.1.1] — 2026-06-08
 
 ### Fixed
