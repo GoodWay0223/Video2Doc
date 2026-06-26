@@ -25,6 +25,18 @@ export SILICONFLOW_API_KEY=sk-xxxxx             # 配置 API Key
 ./video2doc.sh --batch links.txt --format all   # 批量处理
 ```
 
+### 🪟 Windows 用户
+
+安装 [Git for Windows](https://git-scm.com/download/win)，打开 Git Bash，脚本即开即用：
+
+```bash
+# Git Bash 终端中
+bash scripts/check_setup.sh
+./video2doc.sh "https://v.douyin.com/xxxx"
+```
+
+也可通过 WSL 或 PowerShell 运行（计划 v0.3.0 提供纯 Python CLI 入口）。
+
 ## 兼容的 Agent
 
 | Agent | 状态 |
