@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.3.0] — 2026-06-26
+
+### Added
+- **`webui.py`**: 本地 Web 可视化界面 — 单文件 Python HTTP 服务+暗色主题前端
+  - 中文界面，粘贴链接即可操作
+  - 实时管道可视化（解析→下载→提取→转录→导出）
+  - 支持选择模式/格式/领域、批量模式
+  - 一键下载输出文件
+  - Windows 兼容（自动检测 ffmpeg.exe、yt-dlp.exe、curl.exe）
+- **Windows 完整支持**：README 新增 Windows 安装说明，Python 后端自动适配 Windows 路径
+
+### Changed
+- Web UI 界面完全中文化
+- `find_executable()` 工具函数支持 Windows .exe 后缀自动检测
+- README 重写为 Web UI 优先体验
+
 ## [v0.2.0] — 2026-06-26
 
 ### Added

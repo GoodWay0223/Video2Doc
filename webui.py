@@ -28,6 +28,28 @@ SCRIPT_DIR = Path(__file__).parent
 OUTPUT_DIR = SCRIPT_DIR / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+# ─── Platform Utils ─────────────────────────────────────
+IS_WINDOWS = os.name == 'nt'
+
+def find_executable(names):
+    """Find the first available executable, Windows-aware"""
+    import shutil as _shutil
+    for name in names:
+        # Try direct command
+        if _shutil.which(name):
+            return name
+        # Try with .exe suffix (Windows)
+        if IS_WINDOWS:
+            exe_name = name + '.exe'
+            if _shutil.which(exe_name):
+                return exe_name
+            # Check common install paths on Windows
+            for base in [os.environ.get('LOCALAPPDATA', ''), os.environ.get('PROGRAMFILES', ''), 'C:\\']:
+                candidate = Path(base) / exe_name
+                if candidate.exists():
+                    return str(candidate)
+    return None
+
 # ─── Job Manager ───────────────────────────────────────
 jobs = {}
 jobs_lock = threading.Lock()
@@ -104,7 +126,7 @@ def process_job(job):
 
         if not video_file:
             job.status = "error"
-            job.error = "Download failed — cookies may be expired or platform not supported."
+            job.error = "下载失败 — cookies 可能已过期或平台暂不支持。"
             return
 
         # Stage 3: Extract Audio
@@ -112,11 +134,9 @@ def process_job(job):
         job.progress = 40
         audio_file = job.dir / "raw" / "audio.mp3"
         audio_file.parent.mkdir(exist_ok=True)
-
-        extract_audio(video_file, audio_file)
-        if not audio_file.exists():
+        if not extract_audio(video_file, audio_file):
             job.status = "error"
-            job.error = "Audio extraction failed."
+            job.error = "音频提取失败，请检查 ffmpeg 是否已安装。"
             return
 
         # Stage 4: Transcribe
@@ -184,20 +204,13 @@ def download_douyin(job):
     return None
 
 def download_generic(job, url):
-    """Download via yt-dlp"""
-    yt_dlps = ["yt-dlp", str(Path.home() / ".workbuddy/binaries/python/envs/default/bin/yt-dlp")]
-    yt_dlp = None
-    for cmd in yt_dlps:
-        try:
-            r = subprocess.run([cmd, "--version"], capture_output=True, text=True, timeout=5)
-            if r.returncode == 0:
-                yt_dlp = cmd
-                break
-        except:
-            continue
-
+    """Download via yt-dlp (Windows-compatible)"""
+    yt_dlp_candidates = ["yt-dlp", "yt-dlp.exe",
+                         str(Path.home() / ".workbuddy" / "binaries" / "python" / "envs" / "default" / "bin" / "yt-dlp"),
+                         str(Path.home() / ".workbuddy" / "binaries" / "python" / "envs" / "default" / "Scripts" / "yt-dlp.exe")]
+    yt_dlp = find_executable(yt_dlp_candidates)
     if not yt_dlp:
-        job.error = "yt-dlp not found. Install: pip install yt-dlp"
+        job.error = "未找到 yt-dlp。请执行: pip install yt-dlp"
         return None
 
     output = str(job.dir / "raw" / "video.%(ext)s")
@@ -214,23 +227,25 @@ def download_generic(job, url):
     return None
 
 def extract_audio(video_file, output_file):
-    """Extract audio as MP3"""
-    ffmpegs = ["ffmpeg", str(Path.home() / ".workbuddy/binaries/ffmpeg/ffmpeg")]
-    for ffmpeg in ffmpegs:
-        try:
-            subprocess.run([ffmpeg, "-i", video_file, "-vn", "-acodec", "libmp3lame",
-                           "-q:a", "2", "-y", str(output_file)],
-                          capture_output=True, timeout=120)
-            if output_file.exists():
-                return
-        except:
-            continue
+    """Extract audio as MP3 (Windows-compatible)"""
+    ffmpeg_candidates = ["ffmpeg", "ffmpeg.exe",
+                         str(Path.home() / ".workbuddy" / "binaries" / "ffmpeg" / "ffmpeg"),
+                         str(Path.home() / ".workbuddy" / "binaries" / "ffmpeg" / "ffmpeg.exe")]
+    ffmpeg = find_executable(ffmpeg_candidates)
+    if not ffmpeg:
+        return False
+    try:
+        subprocess.run([ffmpeg, "-i", str(video_file), "-vn", "-acodec", "libmp3lame",
+                       "-q:a", "2", "-y", str(output_file)],
+                      capture_output=True, timeout=120)
+        return output_file.exists()
+    except:
+        return False
 
 def transcribe(audio_file, job):
-    """Transcribe via TeleSpeechASR"""
+    """Transcribe via TeleSpeechASR (Windows-compatible)"""
     api_key = os.environ.get("SILICONFLOW_API_KEY", "")
     if not api_key:
-        # Try load_config
         config_path = Path.home() / ".video2doc" / "config.json"
         if config_path.exists():
             try:
@@ -239,7 +254,6 @@ def transcribe(audio_file, job):
             except:
                 pass
     if not api_key:
-        # Try WorkBuddy legacy
         wb_path = Path.home() / ".workbuddy" / "MEMORY.md"
         if wb_path.exists():
             content = wb_path.read_text()
@@ -248,12 +262,14 @@ def transcribe(audio_file, job):
                 api_key = match.group(1)
 
     if not api_key:
-        job.error = "No API key found. Set SILICONFLOW_API_KEY env var or configure ~/.video2doc/config.json"
+        job.error = "未找到 API Key。请设置 SILICONFLOW_API_KEY 环境变量，或配置 ~/.video2doc/config.json"
         return None
+
+    curl_cmd = find_executable(["curl", "curl.exe"]) or "curl"
 
     try:
         result = subprocess.run(
-            ["curl", "-s", "--max-time", "120", "--retry", "3", "--retry-delay", "2",
+            [curl_cmd, "-s", "--max-time", "120", "--retry", "3", "--retry-delay", "2",
              "https://api.siliconflow.cn/v1/audio/transcriptions",
              "-H", f"Authorization: Bearer {api_key}",
              "-F", f"file=@{audio_file}",
@@ -320,7 +336,7 @@ HTML_PAGE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video2Doc — Video Transcription Studio</title>
+<title>Video2Doc — 视频转录工坊</title>
 <style>
   :root {
     --bg: #0F0F11;
@@ -447,62 +463,62 @@ HTML_PAGE = """<!DOCTYPE html>
     <span class="ver">v0.3</span>
   </div>
   <div class="pipeline" id="pipeline">
-    <div class="label">Pipeline</div>
-    <div class="step" data-stage="resolving"><span class="dot"></span> Resolve URL</div>
-    <div class="step" data-stage="downloading"><span class="dot"></span> Download</div>
-    <div class="step" data-stage="extracting"><span class="dot"></span> Extract Audio</div>
-    <div class="step" data-stage="transcribing"><span class="dot"></span> Transcribe</div>
-    <div class="step" data-stage="exporting"><span class="dot"></span> Export</div>
+    <div class="label">处理流水线</div>
+    <div class="step" data-stage="resolving"><span class="dot"></span> 解析链接</div>
+    <div class="step" data-stage="downloading"><span class="dot"></span> 下载视频</div>
+    <div class="step" data-stage="extracting"><span class="dot"></span> 提取音频</div>
+    <div class="step" data-stage="transcribing"><span class="dot"></span> 语音转录</div>
+    <div class="step" data-stage="exporting"><span class="dot"></span> 导出文件</div>
   </div>
   <div class="history" id="sidebar-history">
-    <h3>History</h3>
+    <h3>历史记录</h3>
   </div>
 </aside>
 
 <main>
   <div class="container">
     <div class="hero">
-      <h1>Video → Document</h1>
-      <p>Paste a Douyin, Bilibili, YouTube link. Get a transcript in seconds.</p>
+      <h1>视频 → 文档</h1>
+      <p>粘贴抖音/B站/YouTube 链接，自动转录为结构化文稿。</p>
     </div>
 
     <!-- Input -->
     <div class="input-group" style="margin-bottom:12px">
-      <input type="text" id="url-input" placeholder="https://v.douyin.com/xxxx or https://youtube.com/watch?v=xxxx"
+      <input type="text" id="url-input" placeholder="https://v.douyin.com/xxxx 或 https://youtube.com/watch?v=xxxx"
              autocomplete="off" autofocus>
-      <button class="btn btn-primary" id="btn-process" onclick="startProcess()">Transcribe</button>
+      <button class="btn btn-primary" id="btn-process" onclick="startProcess()">开始转录</button>
     </div>
 
     <!-- Settings -->
     <div class="settings">
       <select id="mode-select">
-        <option value="transcript">📝 Transcript (MD)</option>
-        <option value="deep">🎨 Deep Analysis (HTML)</option>
+        <option value="transcript">📝 纯文稿 (MD)</option>
+        <option value="deep">🎨 深度分析 (HTML)</option>
       </select>
       <select id="format-select">
-        <option value="md">Format: MD</option>
-        <option value="srt">Format: SRT</option>
-        <option value="txt">Format: TXT</option>
-        <option value="json">Format: JSON</option>
-        <option value="all">Format: All</option>
+        <option value="md">格式：MD</option>
+        <option value="srt">格式：SRT 字幕</option>
+        <option value="txt">格式：TXT</option>
+        <option value="json">格式：JSON</option>
+        <option value="all">格式：全部</option>
       </select>
       <select id="domain-select">
-        <option value="">Domain: Auto-detect</option>
-        <option value="auto">Domain: Auto 🚗</option>
-        <option value="tech">Domain: Tech 💻</option>
+        <option value="">领域：自动检测</option>
+        <option value="auto">领域：汽车 🚗</option>
+        <option value="tech">领域：科技 💻</option>
       </select>
     </div>
 
     <!-- Batch toggle -->
     <div class="batch-toggle" style="margin-top:8px">
-      <button onclick="toggleBatch()">+ Batch mode</button>
+      <button onclick="toggleBatch()">+ 批量模式</button>
     </div>
     <div class="batch-area" id="batch-area">
-      <textarea id="batch-input" placeholder="Paste multiple links, one per line:
+      <textarea id="batch-input" placeholder="粘贴多个链接，一行一个：
 https://v.douyin.com/xxxx
 https://www.youtube.com/watch?v=xxxx
-# Lines starting with # are ignored"></textarea>
-      <div class="hint">One link per line. Lines starting with # are skipped.</div>
+# 以 # 开头的行为注释，自动跳过"></textarea>
+      <div class="hint">一行一个链接，# 开头的行为注释会被跳过</div>
     </div>
 
     <!-- Progress -->
@@ -520,7 +536,7 @@ https://www.youtube.com/watch?v=xxxx
     <!-- Results -->
     <div class="results" id="results">
       <div class="card">
-        <h3 id="result-title">Output Files</h3>
+        <h3 id="result-title">输出文件</h3>
         <div class="files" id="result-files"></div>
       </div>
     </div>
@@ -544,7 +560,7 @@ async function startProcess() {
   }
 
   if (links.length === 0) {
-    alert('Please enter a video link.');
+    alert('请输入视频链接。');
     return;
   }
 
@@ -556,7 +572,7 @@ async function startProcess() {
   document.getElementById('error-msg').classList.remove('visible');
   document.getElementById('results').classList.remove('visible');
   document.getElementById('progress-panel').classList.add('visible');
-  document.getElementById('status-text').textContent = 'Starting...';
+  document.getElementById('status-text').textContent = '正在启动...';
   document.getElementById('pct-text').textContent = '0%';
   document.getElementById('progress-bar').style.width = '0%';
   document.getElementById('spinner').style.display = 'inline-block';
@@ -579,7 +595,7 @@ async function startProcess() {
     currentJobId = data.job_id;
     pollStatus();
   } catch (e) {
-    showError('Connection failed. Is the server running?');
+    showError('连接失败，是否已启动 webui.py？');
   }
 }
 
@@ -591,7 +607,8 @@ async function pollStatus() {
     const job = await response.json();
 
     updatePipeline(job.status);
-    document.getElementById('status-text').textContent = job.status.charAt(0).toUpperCase() + job.status.slice(1);
+    const statusMap = {'resolving':'解析链接中','downloading':'下载视频中','extracting':'提取音频中','transcribing':'语音转录中','exporting':'导出文件中','done':'处理完成','error':'处理失败','queued':'排队中'};
+    document.getElementById('status-text').textContent = statusMap[job.status] || job.status;
     document.getElementById('pct-text').textContent = job.progress + '%';
     document.getElementById('progress-bar').style.width = job.progress + '%';
 
@@ -830,10 +847,10 @@ def main():
     server = http.server.HTTPServer(('0.0.0.0', PORT), APIHandler)
     print(f"""
 ╔══════════════════════════════════════════╗
-║   🎬 Video2Doc Studio v0.3.0            ║
+║   🎬 Video2Doc 工坊 v0.3.0               ║
 ║                                          ║
-║   Open: http://localhost:{PORT}             ║
-║   Press Ctrl+C to stop                   ║
+║   打开: http://localhost:{PORT}              ║
+║   按 Ctrl+C 停止                           ║
 ╚══════════════════════════════════════════╝
     """)
     try:

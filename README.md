@@ -15,27 +15,43 @@ Video2Doc 既是一个 **AI Agent Skill**，也是一个独立的 **CLI 工具**
 
 ## 快速开始
 
+### Mac / Linux
+
 ```bash
 git clone https://github.com/GoodWay0223/Video2Doc.git
 cd Video2Doc
 bash scripts/check_setup.sh                    # 环境检查
 
 export SILICONFLOW_API_KEY=sk-xxxxx             # 配置 API Key
-./video2doc.sh "https://v.douyin.com/xxxx"      # 转录视频
+python3 webui.py                                # 🆕 启动可视化界面
+```
+
+打开 `http://localhost:8765`，粘贴链接即可转录。
+
+CLI 模式也支持：
+
+```bash
+./video2doc.sh "https://v.douyin.com/xxxx"      # 命令行转录
 ./video2doc.sh --batch links.txt --format all   # 批量处理
 ```
 
-### 🪟 Windows 用户
+### 🪟 Windows
 
-安装 [Git for Windows](https://git-scm.com/download/win)，打开 Git Bash，脚本即开即用：
+安装 [Git for Windows](https://git-scm.com/download/win) 和 [Python 3.9+](https://python.org)：
 
 ```bash
 # Git Bash 终端中
+git clone https://github.com/GoodWay0223/Video2Doc.git
+cd Video2Doc
 bash scripts/check_setup.sh
-./video2doc.sh "https://v.douyin.com/xxxx"
+
+set SILICONFLOW_API_KEY=sk-xxxxx                 # CMD 中设置环境变量
+# 或 Git Bash: export SILICONFLOW_API_KEY=sk-xxxxx
+
+python webui.py                                  # 启动可视化界面
 ```
 
-也可通过 WSL 或 PowerShell 运行（计划 v0.3.0 提供纯 Python CLI 入口）。
+> Windows 下需要额外安装 ffmpeg：`winget install ffmpeg` 或 `choco install ffmpeg`
 
 ## 兼容的 Agent
 
@@ -60,6 +76,7 @@ bash scripts/check_setup.sh
 - **批量处理**：`--batch links.txt` 一次处理多个链接
 - **智能校正**：内置规则库自动修正常见 ASR 错误
 - **跨 Agent 配置**：API Key 支持环境变量 / `~/.video2doc/config.json` / WorkBuddy 兼容
+- **🆕 Web 可视化界面**：`python3 webui.py` 启动本地服务，浏览器操作，不需要命令行知识
 
 ## 通过 Agent 安装
 
@@ -93,6 +110,7 @@ echo '{"siliconflow_api_key":"sk-xxxxx"}' > ~/.video2doc/config.json
 ```
 Video2Doc/
 ├── video2doc.sh              # CLI 入口（单视频/批量）
+├── webui.py                   # 🆕 Web 可视化界面入口
 ├── SKILL.md                  # Agent Skill 完整工作流
 ├── README.md                 # 本文件
 ├── CHANGELOG.md              # 版本记录
