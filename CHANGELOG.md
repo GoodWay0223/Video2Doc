@@ -1,5 +1,32 @@
 # Changelog
 
+## [v0.4.0] — 2026-06-26
+
+### Added
+- **三大核心功能**：视频下载、在线视频转录、本地媒体转录
+- **全新首页**：暗色工业风 + 毛玻璃 + 三列功能卡片 + Hero区
+- **三个全屏模态弹窗**：各有独立的功能色（下载翠绿/转录天蓝/本地薰衣紫）
+- **视频下载**：支持「下载后同时转录为文稿」可选勾选框
+- **本地转录**：拖拽上传区 + 文件信息展示 + 200MB大小限制
+- **双Tab结果展示**：文稿 + SRT字幕切换，支持复制/下载
+- **步骤进度指示器**：横向步骤条 + 实时状态动画
+- **首页历史记录**：底部最近处理列表
+
+### Changed
+- **代码架构重构**：`webui.py` 拆分为 `webui/` 包（server / job_manager / pipeline / templates）
+- HTML 模板从 Python 字符串迁出为独立文件 `webui/static/index.html`
+- Job 模型新增 `JobType`（download / transcribe_online / transcribe_local）
+- API 端点新增：`/api/download-video`、`/api/transcribe-online`、`/api/transcribe-local`、`/api/content/`
+- Python 3.13 兼容（移除 `cgi` 模块，改为手动 multipart 解析）
+
+### Design
+- 借鉴"非丨链接提取文案"项目前端设计，但全面升级：
+  - 紫蓝亮渐变 → 暗色深蓝基调 (#08090B → #111627)
+  - 毛玻璃骨架保留（`rgba(15,17,25,0.88)` + `backdrop-filter: blur(24px)`）
+  - 三功能色克制区分（翠绿/天蓝/薰衣紫）
+  - 拒绝过度动效：仅 fadeIn/slideUp/transition 基础动画
+  - 响应式 768px 断点
+
 ## [v0.3.0] — 2026-06-26
 
 ### Added
