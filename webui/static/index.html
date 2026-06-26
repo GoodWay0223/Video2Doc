@@ -6,352 +6,345 @@
 <title>Video2Doc — 视频工坊</title>
 <style>
 :root {
-  --bg-base: #08090B;
-  --bg-card: rgba(15, 17, 25, 0.88);
-  --glass-border: rgba(255,255,255,0.06);
-  --surface: #141820;
-  --surface-hover: #1A1F2B;
-  --border: rgba(255,255,255,0.08);
-  --border-hover: rgba(255,255,255,0.14);
-  --text: #E8E9ED;
-  --text-secondary: #8B8FA3;
-  --text-muted: #5C6073;
-  --accent-download: #4ADE80;
-  --accent-transcribe: #60A5FA;
-  --accent-local: #C084FC;
-  --success: #34D399;
-  --warning: #FBBF24;
-  --error: #F87171;
-  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --purple-start: #667eea;
+  --purple-end: #764ba2;
+  --primary: #667eea;
+  --success: #28a745;
+  --danger: #dc3545;
+  --info: #007bff;
+  --warning: #ffc107;
+  --card-bg: linear-gradient(145deg, #ffffff, #f8f9fa);
+  --glass-bg: rgba(255,255,255,0.95);
+  --text-dark: #333;
+  --text-muted: #666;
+  --text-light: #999;
+  --border: #e9ecef;
+  --radius: 15px;
+  --radius-sm: 10px;
+  --shadow: 0 10px 30px rgba(0,0,0,0.1);
+  --shadow-hover: 0 20px 40px rgba(0,0,0,0.15);
+  --font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: var(--font-sans); background: linear-gradient(135deg, #0D1117, #111627, #0F1420); color: var(--text); min-height: 100vh; }
-.bg-layer { position: fixed; inset:0; background: radial-gradient(ellipse at 50% 0%, rgba(96,165,250,0.04) 0%, transparent 70%); pointer-events:none; z-index:0; }
-.main-container { position:relative; z-index:1; max-width:960px; margin:0 auto; padding:48px 24px; }
-.main-glass { background: var(--bg-card); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border:1px solid var(--glass-border); border-radius:20px; padding:40px; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: linear-gradient(135deg, var(--purple-start) 0%, var(--purple-end) 100%);
+  min-height: 100vh;
+  font-family: var(--font);
+  background-attachment: fixed;
+}
+.main-container {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  margin: 2rem auto;
+  padding: 2rem;
+  max-width: 920px;
+}
 
-/* Hero */
-.hero { text-align:center; margin-bottom:40px; }
-.hero h1 { font-size:32px; font-weight:800; letter-spacing:-0.5px; margin-bottom:8px; animation: fadeIn 0.5s ease-out; }
-.hero h1 span { background: linear-gradient(135deg, #60A5FA, #C084FC); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.hero p { color: var(--text-secondary); font-size:15px; }
-.hero-stats { display:flex; justify-content:center; gap:32px; margin-top:24px; flex-wrap:wrap; }
-.stat-item { background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:12px; padding:16px 24px; min-width:120px; transition: all 0.2s ease; }
-.stat-item:hover { background:rgba(255,255,255,0.06); border-color:var(--border-hover); }
-.stat-num { display:block; font-size:24px; font-weight:800; font-family:var(--font-mono); }
-.stat-label { display:block; font-size:12px; color:var(--text-muted); margin-top:4px; }
+/* ─── Hero ──────────────────────────── */
+.hero-section {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  color: white;
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  text-align: center;
+}
+.hero-section::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="n" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1" fill="white" opacity="0.1"/><circle cx="80" cy="80" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="30" r="0.8" fill="white" opacity="0.08"/><circle cx="10" cy="70" r="0.6" fill="white" opacity="0.12"/></pattern></defs><rect width="100" height="100" fill="url(%23n)"/></svg>');
+  pointer-events: none;
+}
+.hero-title { font-size: 2.2rem; font-weight: 800; margin-bottom: .5rem; position:relative; z-index:1; text-shadow: 0 2px 10px rgba(0,0,0,.2); letter-spacing: -.5px; }
+.hero-subtitle { font-size: 1.05rem; opacity: .95; position:relative; z-index:1; margin-bottom: 1.5rem; }
+.stats-row { display:flex; justify-content:center; gap:2rem; position:relative; z-index:1; flex-wrap:wrap; }
+.stat-item { text-align:center; background: rgba(255,255,255,.15); border-radius: 15px; padding: 1.2rem 1.8rem; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,.3); transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); min-width: 120px; position:relative; overflow:hidden; }
+.stat-item::before { content:''; position:absolute; top:0; left:-100%; width:100%; height:100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.1), transparent); transition: left .5s; }
+.stat-item:hover::before { left:100%; }
+.stat-item:hover { transform: translateY(-5px) scale(1.05); background:rgba(255,255,255,.25); box-shadow: 0 10px 25px rgba(0,0,0,.2); }
+.stat-number { font-size:1.8rem; font-weight:800; color:#fff; line-height:1; text-shadow: 0 2px 10px rgba(0,0,0,.3); margin-bottom:.3rem; }
+.stat-label { font-size:.85rem; color:rgba(255,255,255,.95); margin-bottom:.2rem; font-weight:600; }
 
-/* Feature Cards */
-.feature-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-bottom:40px; }
-.card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px 24px; cursor:pointer; transition:all 0.25s ease; position:relative; overflow:hidden; }
-.card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; opacity:0; transition:opacity 0.25s; }
-.card:hover { transform:translateY(-2px); border-color:var(--border-hover); }
-.card-download:hover { border-color:rgba(74,222,128,0.3); box-shadow:0 4px 24px rgba(74,222,128,0.08); }
-.card-download:hover::before { opacity:1; background:var(--accent-download); }
-.card-transcribe:hover { border-color:rgba(96,165,250,0.3); box-shadow:0 4px 24px rgba(96,165,250,0.08); }
-.card-transcribe:hover::before { opacity:1; background:var(--accent-transcribe); }
-.card-local:hover { border-color:rgba(192,132,252,0.3); box-shadow:0 4px 24px rgba(192,132,252,0.08); }
-.card-local:hover::before { opacity:1; background:var(--accent-local); }
-.card-icon { font-size:32px; margin-bottom:16px; }
-.card h3 { font-size:17px; font-weight:700; margin-bottom:8px; }
-.card p { color:var(--text-secondary); font-size:13px; line-height:1.6; margin-bottom:14px; }
-.card-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
-.card-tags span { font-size:11px; color:var(--text-muted); background:rgba(255,255,255,0.04); padding:3px 8px; border-radius:4px; }
-.card .btn-card { width:100%; padding:10px 0; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text); font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; font-family:var(--font-sans); }
-.card-download .btn-card:hover { background:rgba(74,222,128,0.12); border-color:var(--accent-download); color:var(--accent-download); }
-.card-transcribe .btn-card:hover { background:rgba(96,165,250,0.12); border-color:var(--accent-transcribe); color:var(--accent-transcribe); }
-.card-local .btn-card:hover { background:rgba(192,132,252,0.12); border-color:var(--accent-local); color:var(--accent-local); }
+/* ─── Section Title ─────────────────── */
+.section-title { text-align:center; margin-bottom: 1.5rem; font-size: 1.4rem; font-weight: 700; color: var(--text-dark); }
 
-/* Modal Overlay */
-.modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px); display:none; align-items:center; justify-content:center; padding:20px; }
-.modal-overlay.show { display:flex; animation:fadeIn 0.2s ease-out; }
-.modal-panel { background:var(--surface); border:1px solid var(--border); border-radius:16px; width:100%; max-width:660px; max-height:90vh; overflow-y:auto; animation:slideUp 0.25s ease-out; }
-.modal-header { padding:20px 24px; display:flex; align-items:center; justify-content:space-between; border-radius:16px 16px 0 0; }
-.modal-download .modal-header { border-bottom:2px solid var(--accent-download); }
-.modal-transcribe .modal-header { border-bottom:2px solid var(--accent-transcribe); }
-.modal-local .modal-header { border-bottom:2px solid var(--accent-local); }
-.modal-header h3 { font-size:18px; font-weight:700; }
-.modal-close { background:none; border:none; color:var(--text-muted); font-size:24px; cursor:pointer; padding:4px 8px; border-radius:6px; transition:all 0.15s; line-height:1; }
-.modal-close:hover { background:rgba(255,255,255,0.06); color:var(--text); }
-.modal-body { padding:24px; }
+/* ─── Feature Cards ─────────────────── */
+.feature-cards { display:grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 2rem; }
+.card { background: var(--card-bg); border: 1px solid rgba(0,0,0,.05); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); display:flex; flex-direction:column; }
+.card:hover { transform: translateY(-8px) scale(1.02); box-shadow: var(--shadow-hover); border-color: rgba(102,126,234,.2); }
+.card-icon { font-size: 2.5rem; margin-bottom: .8rem; }
+.card h3 { font-size: 1.1rem; font-weight: 700; color: var(--text-dark); margin-bottom: .5rem; }
+.card p { color: var(--text-muted); font-size: .85rem; line-height: 1.5; margin-bottom: .8rem; }
+.card-tags { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin-bottom: 1rem; }
+.tag { background: #f0f0f0; padding: 4px 10px; border-radius: 12px; font-size: .72rem; color: #495057; font-weight: 500; }
+.tag.green { background: var(--success); color: white; }
+.tag.blue { background: var(--info); color: white; }
+.tag.purple { background: var(--purple-start); color: white; }
+.card .btn { width:100%; border:none; border-radius: 25px; padding: .7rem 1.5rem; font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .3s ease; text-transform: uppercase; letter-spacing: .5px; position:relative; overflow:hidden; margin-top: auto; }
+.card .btn::before { content:''; position:absolute; top:50%; left:50%; width:0; height:0; background:rgba(255,255,255,.3); border-radius:50%; transform:translate(-50%,-50%); transition: width .6s, height .6s; }
+.card .btn:hover::before { width:400px; height:400px; }
+.btn-download { background: linear-gradient(135deg, #dc3545, #c82333); color: white; }
+.btn-download:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(220,53,69,.3); }
+.btn-transcribe { background: linear-gradient(45deg, #667eea, #764ba2); color: white; }
+.btn-transcribe:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102,126,234,.3); }
+.btn-local { background: linear-gradient(135deg, #28a745, #20c997); color: white; }
+.btn-local:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(40,167,69,.3); }
 
-/* Modal Input */
-.modal-input { display:flex; gap:10px; margin-bottom:24px; }
-.modal-input input { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 16px; font-size:14px; color:var(--text); font-family:var(--font-mono); outline:none; transition:border-color 0.2s; }
-.modal-input input:focus { border-color:var(--accent-transcribe); }
-.modal-input input::placeholder { color:var(--text-muted); }
-.modal-input-options { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
-.modal-input-options select, .modal-input-options label { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-size:12px; color:var(--text); outline:none; font-family:var(--font-sans); cursor:pointer; }
-.modal-input-options label { display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; }
-.modal-input-options input[type=checkbox] { accent-color:var(--accent-transcribe); }
+/* ─── Modal ─────────────────────────── */
+.modal-overlay { position:fixed; inset:0; z-index:1000; background: rgba(0,0,0,.6); backdrop-filter: blur(8px); display:none; align-items:center; justify-content:center; padding:20px; }
+.modal-overlay.show { display:flex; animation: fadeIn .2s ease-out; }
+.modal-panel { background: var(--glass-bg); backdrop-filter: blur(10px); border-radius: var(--radius); width:100%; max-width:660px; max-height:90vh; overflow-y:auto; animation: slideUp .3s ease-out; box-shadow: 0 25px 50px rgba(0,0,0,.2); }
+.modal-header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; border-radius: var(--radius) var(--radius) 0 0; }
+.modal-header.dl { background: linear-gradient(135deg, #dc3545, #c82333); }
+.modal-header.tr { background: linear-gradient(135deg, #667eea, #764ba2); }
+.modal-header.lo { background: linear-gradient(135deg, #28a745, #20c997); }
+.modal-header h3 { font-size: 1.1rem; font-weight: 700; }
+.modal-close { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; opacity: .8; transition: opacity .2s; padding: 0 4px; }
+.modal-close:hover { opacity: 1; }
+.modal-body { padding: 1.5rem; }
 
-/* Buttons */
-.btn { padding:10px 22px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.15s; font-family:var(--font-sans); }
-.btn-dl { background:var(--accent-download); color:#000; }
-.btn-dl:hover { filter:brightness(1.1); }
-.btn-tr { background:var(--accent-transcribe); color:#000; }
-.btn-tr:hover { filter:brightness(1.1); }
-.btn-lo { background:var(--accent-local); color:#000; }
-.btn-lo:hover { filter:brightness(1.1); }
-.btn:disabled { opacity:0.4; cursor:not-allowed; }
-.btn-sm { padding:6px 14px; font-size:12px; border-radius:6px; }
-.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text-secondary); }
-.btn-outline:hover { border-color:var(--text-muted); color:var(--text); }
+/* ─── Form Controls ─────────────────── */
+.form-control { width:100%; border-radius: var(--radius-sm); border: 2px solid var(--border); padding: .75rem 1rem; font-size: .9rem; color: var(--text-dark); outline: none; transition: all .3s ease; font-family: var(--font); }
+.form-control:focus { border-color: var(--purple-start); box-shadow: 0 0 0 .2rem rgba(102,126,234,.25); }
+.form-control::placeholder { color: #999; }
+.input-row { display:flex; gap:10px; margin-bottom: 1rem; }
+.input-row .form-control { flex:1; }
+.btn-action { border: none; border-radius: 25px; padding: .7rem 1.8rem; font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .3s ease; white-space: nowrap; text-transform: uppercase; letter-spacing: .5px; }
+.btn-action:hover { transform: translateY(-2px); }
+.btn-dl { background: linear-gradient(135deg, #dc3545, #c82333); color: white; }
+.btn-dl:hover { box-shadow: 0 10px 20px rgba(220,53,69,.3); }
+.btn-tr { background: linear-gradient(45deg, #667eea, #764ba2); color: white; }
+.btn-tr:hover { box-shadow: 0 10px 20px rgba(102,126,234,.3); }
+.btn-lo { background: linear-gradient(135deg, #28a745, #20c997); color: white; }
+.btn-lo:hover { box-shadow: 0 10px 20px rgba(40,167,69,.3); }
+.btn-action:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-sm { padding: .4rem 1rem; font-size: .8rem; border-radius: 20px; text-transform: none; letter-spacing: 0; }
 
-/* Step Indicator */
-.step-indicator { display:flex; align-items:center; justify-content:space-between; margin:24px 0; }
-.step-indicator .step { display:flex; align-items:center; gap:8px; flex-direction:column; flex:1; text-align:center; position:relative; }
-.step-indicator .step::after { content:''; position:absolute; top:12px; left:55%; width:90%; height:2px; background:var(--border); z-index:0; }
-.step-indicator .step:last-child::after { display:none; }
-.step-indicator .step .dot { width:24px; height:24px; border-radius:50%; border:2px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; transition:all 0.3s; position:relative; z-index:1; }
-.step-indicator .step .label { font-size:11px; color:var(--text-muted); margin-top:6px; transition:color 0.3s; }
-.step-indicator .step.active .dot { border-color:var(--accent-transcribe); background:rgba(96,165,250,0.15); box-shadow:0 0 12px rgba(96,165,250,0.3); animation:pulse 1.5s ease-in-out infinite; }
-.step-indicator .step.active .label { color:var(--accent-transcribe); }
-.step-indicator .step.done .dot { border-color:var(--success); background:var(--success); color:#000; }
-.step-indicator .step.done .dot::after { content:'✓'; }
-.step-indicator .step.done .label { color:var(--success); }
-.step-indicator .step.error .dot { border-color:var(--error); background:rgba(248,113,113,0.2); }
-.step-indicator .step.error .label { color:var(--error); }
-@keyframes pulse { 0%,100% { box-shadow:0 0 8px rgba(96,165,250,0.3); } 50% { box-shadow:0 0 18px rgba(96,165,250,0.5); } }
+/* Options row */
+.opts-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom: 1rem; }
+.opts-row select { border-radius: var(--radius-sm); border: 2px solid var(--border); padding: .5rem .8rem; font-size: .8rem; color: var(--text-dark); outline: none; background: white; cursor: pointer; font-family: var(--font); }
+.opts-row select:focus { border-color: var(--purple-start); }
+.opts-row label { display:flex; align-items:center; gap:4px; font-size: .8rem; color: var(--text-muted); cursor: pointer; user-select:none; }
 
-/* Progress Bar */
-.progress-section { display:none; margin:20px 0; }
+/* ─── Progress Steps ────────────────── */
+.progress-steps { display:flex; justify-content:space-between; margin: 1.5rem 0 1rem; flex-wrap:wrap; gap: .5rem; }
+.progress-step { flex:1; min-width:80px; text-align:center; transition: all .3s ease; }
+.step-icon { font-size: 1.8rem; margin-bottom: .3rem; opacity: .3; transition: all .3s ease; }
+.step-label { font-weight: 600; color: var(--text-muted); font-size: .8rem; }
+.step-status { font-size: .7rem; color: var(--text-light); }
+.progress-step.active .step-icon { opacity:1; transform: scale(1.1); animation: pulse 1.5s infinite; }
+.progress-step.active .step-label { color: var(--purple-start); }
+.progress-step.active .step-status { color: var(--purple-start); font-weight:500; }
+.progress-step.completed .step-icon { opacity:1; color: var(--success); }
+.progress-step.completed .step-label { color: var(--success); }
+.progress-step.completed .step-status { color: var(--success); }
+@keyframes pulse { 0%{transform:scale(1.1)} 50%{transform:scale(1.2)} 100%{transform:scale(1.1)} }
+
+.progress-section { display:none; margin: 1rem 0; }
 .progress-section.show { display:block; }
-.progress-info { display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px; }
-.progress-bar-outer { height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
-.progress-bar-inner { height:100%; background:var(--accent-transcribe); border-radius:2px; transition:width 0.5s ease; width:0; }
-.spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent-transcribe); border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:middle; margin-right:6px; }
-@keyframes spin { to { transform:rotate(360deg); } }
+.progress-info { text-align:center; color: var(--purple-start); font-weight:500; font-size:.9rem; margin-bottom:.5rem; }
+.progress-bar-outer { height: 8px; background: var(--border); border-radius: 4px; overflow:hidden; }
+.progress-bar-inner { height:100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 4px; transition: width .5s ease; width:0; }
 
-/* Results */
-.result-section { display:none; margin-top:20px; }
-.result-section.show { display:block; animation:fadeIn 0.3s ease-out; }
-.result-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:16px; }
-.result-tab { padding:8px 16px; font-size:13px; color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; background:none; border-top:none; border-left:none; border-right:none; font-family:var(--font-sans); }
-.result-tab:hover { color:var(--text); }
-.result-tab.active { color:var(--accent-transcribe); border-bottom-color:var(--accent-transcribe); }
-.result-content { background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:8px; padding:16px; max-height:320px; overflow-y:auto; font-size:13px; line-height:1.8; font-family:var(--font-sans); white-space:pre-wrap; }
-.result-actions { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+/* ─── Results ───────────────────────── */
+.result-section { display:none; margin-top: 1.5rem; animation: fadeIn .3s ease-out; }
+.result-section.show { display:block; }
+.result-tabs { display:flex; gap:0; border-bottom: 2px solid var(--border); margin-bottom: 1rem; }
+.result-tab { padding: .5rem 1rem; border:none; background:none; font-size: .85rem; color: var(--text-muted); cursor:pointer; font-weight:600; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .2s; font-family: var(--font); }
+.result-tab:hover { color: var(--purple-start); }
+.result-tab.active { color: var(--purple-start); border-bottom-color: var(--purple-start); }
+.result-content { background: #f8f9fa; border-radius: var(--radius-sm); padding: 1.2rem; font-size: .95rem; line-height: 1.8; color: var(--text-dark); max-height: 320px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #dee2e6; display:none; }
+.result-content.active { display:block; }
+.result-actions { display:flex; gap: .5rem; margin-top: .8rem; flex-wrap:wrap; }
+.result-actions a { text-decoration:none; }
 
-/* Error */
-.error-msg { background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.2); border-radius:8px; padding:12px 16px; color:var(--error); font-size:13px; display:none; margin-top:16px; }
+/* ─── Upload Zone ───────────────────── */
+.upload-zone { border: 2px dashed #ced4da; border-radius: var(--radius-sm); padding: 2.5rem 1.5rem; text-align: center; transition: all .3s; cursor: pointer; margin-bottom: 1rem; }
+.upload-zone:hover, .upload-zone.drag-over { border-color: var(--success); background: rgba(40,167,69,.03); }
+.upload-zone .icon { font-size: 2.5rem; margin-bottom: .8rem; }
+.upload-zone p { color: var(--text-muted); font-size: .9rem; margin-bottom: .3rem; }
+.upload-zone small { color: var(--text-light); font-size: .75rem; display:block; }
+.upload-zone.file-selected { border-style: solid; border-color: var(--success); padding: 1.2rem; }
+.file-info { display:flex; align-items:center; justify-content:space-between; }
+.file-info .name { font-weight:600; color: var(--text-dark); }
+.file-info .size { color: var(--text-light); font-size: .8rem; }
+
+/* ─── Error ─────────────────────────── */
+.error-msg { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: var(--radius-sm); padding: .8rem 1rem; margin-top: 1rem; font-size: .85rem; display:none; }
 .error-msg.show { display:block; }
 
-/* Upload Zone */
-.upload-zone { border:2px dashed var(--border); border-radius:12px; padding:40px; text-align:center; transition:all 0.2s; cursor:pointer; margin-bottom:20px; }
-.upload-zone:hover, .upload-zone.drag-over { border-color:var(--accent-local); background:rgba(192,132,252,0.05); }
-.upload-zone .icon { font-size:40px; margin-bottom:12px; }
-.upload-zone p { color:var(--text-secondary); font-size:14px; margin-bottom:4px; }
-.upload-zone small { color:var(--text-muted); font-size:12px; }
-.upload-zone.file-selected { border-style:solid; border-color:var(--accent-local); padding:20px; }
-.file-info { display:flex; align-items:center; justify-content:space-between; }
-.file-info .name { font-weight:600; color:var(--text); font-size:14px; }
-.file-info .size { color:var(--text-muted); font-size:12px; font-family:var(--font-mono); }
-
-/* History */
-.history-section { margin-top:32px; }
-.history-section h3 { font-size:14px; color:var(--text-muted); margin-bottom:12px; text-transform:uppercase; letter-spacing:1px; }
+/* ─── History ───────────────────────── */
+.history-section { margin-top: 1.5rem; }
+.history-section h4 { font-size: .95rem; color: var(--text-muted); margin-bottom: .8rem; }
 .history-list { display:flex; flex-direction:column; gap:6px; }
-.history-item { display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.15s; font-size:13px; }
-.history-item:hover { background:rgba(255,255,255,0.04); border-color:var(--border-hover); }
-.history-item .hist-icon { width:20px; text-align:center; }
-.history-item .hist-title { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.history-item .hist-time { color:var(--text-muted); font-size:11px; font-family:var(--font-mono); }
+.history-item { display:flex; align-items:center; gap:10px; padding: 8px 12px; background: #f8f9fa; border: 1px solid var(--border); border-radius: 8px; cursor:pointer; font-size:.85rem; transition: all .15s; }
+.history-item:hover { background: #e9ecef; }
+.history-item .hist-icon { font-size: 1rem; }
+.history-item .hist-title { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color: var(--text-dark); }
+.history-item .hist-time { color: var(--text-light); font-size: .78rem; }
 
-/* Footer */
-.footer { text-align:center; margin-top:40px; padding-top:20px; border-top:1px solid var(--border); }
-.footer p { color:var(--text-muted); font-size:12px; }
+/* ─── Footer ────────────────────────── */
+.footer { text-align:center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: .85rem; }
 
-/* Animations */
-@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-@keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+/* ─── Animations ────────────────────── */
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
 
-/* Responsive */
+/* ─── Responsive ────────────────────── */
 @media (max-width:768px) {
-  .main-container { padding:24px 16px; }
-  .main-glass { padding:24px 16px; }
+  .main-container { margin:1rem; padding:1.5rem; }
   .feature-cards { grid-template-columns:1fr; }
-  .hero h1 { font-size:24px; }
-  .modal-panel { max-width:95vw; border-radius:12px; }
-  .modal-header { border-radius:12px 12px 0 0; }
-  .step-indicator .step .label { display:none; }
-  .modal-input { flex-direction:column; }
+  .hero-title { font-size:1.5rem; }
+  .hero-section { padding:1.5rem 1rem; }
+  .stats-row { gap:1rem; }
+  .stat-item { padding:.8rem 1rem; min-width:90px; }
+  .stat-number { font-size:1.3rem; }
+  .modal-panel { max-width:95vw; }
+  .progress-steps { flex-direction:column; }
+  .input-row { flex-direction:column; }
+  .opts-row { flex-direction:column; align-items:flex-start; }
 }
 </style>
 </head>
 <body>
-<div class="bg-layer"></div>
 
 <div class="main-container">
-<div class="main-glass">
 
   <!-- Hero -->
-  <section class="hero">
-    <h1>Video2Doc <span>视频工坊</span></h1>
-    <p>下载 / 转录 / 处理，一站式视频工具</p>
-    <div class="hero-stats">
-      <div class="stat-item"><span class="stat-num">3</span><span class="stat-label">核心功能</span></div>
-      <div class="stat-item"><span class="stat-num">95%+</span><span class="stat-label">AI 准确率</span></div>
-      <div class="stat-item"><span class="stat-num">4</span><span class="stat-label">输出格式</span></div>
+  <div class="hero-section">
+    <h1 class="hero-title">🎬 Video2Doc · 视频工坊</h1>
+    <p class="hero-subtitle">下载 / 转录 / 处理 · 一站式视频工具</p>
+    <div class="stats-row">
+      <div class="stat-item"><div class="stat-number">3</div><div class="stat-label">核心功能</div></div>
+      <div class="stat-item"><div class="stat-number">95%+</div><div class="stat-label">AI 准确率</div></div>
+      <div class="stat-item"><div class="stat-number">4</div><div class="stat-label">输出格式</div></div>
     </div>
-  </section>
+  </div>
+
+  <!-- Section Title -->
+  <h2 class="section-title">⚡ 核心功能</h2>
 
   <!-- Feature Cards -->
-  <section class="feature-cards">
+  <div class="feature-cards">
 
-    <div class="card card-download" onclick="openModal('download')">
+    <div class="card" onclick="openModal('download')">
       <div class="card-icon">📥</div>
       <h3>视频下载</h3>
-      <p>输入链接，下载原视频文件到本地</p>
-      <div class="card-tags"><span>抖音</span><span>B站</span><span>YouTube</span></div>
-      <button class="btn-card">下载视频</button>
+      <p>输入抖音或B站视频链接<br>一键下载高清无水印视频</p>
+      <div class="card-tags"><span class="tag green">🎵 抖音</span><span class="tag blue">📺 B站</span><span class="tag">▶ YouTube</span></div>
+      <button class="btn btn-download">📥 下载视频</button>
     </div>
 
-    <div class="card card-transcribe" onclick="openModal('transcribe')">
-      <div class="card-icon">🎙️</div>
+    <div class="card" onclick="openModal('transcribe')">
+      <div class="card-icon">✨</div>
       <h3>在线视频转录</h3>
-      <p>输入链接，AI 自动转录为结构化文稿</p>
-      <div class="card-tags"><span>MD</span><span>SRT</span><span>TXT</span><span>JSON</span></div>
-      <button class="btn-card">开始转录</button>
+      <p>复制链接即可提取视频文案<br>AI智能识别语音内容</p>
+      <div class="card-tags"><span class="tag purple">MD</span><span class="tag">SRT</span><span class="tag">TXT</span><span class="tag">JSON</span></div>
+      <button class="btn btn-transcribe">✨ 开始转录</button>
     </div>
 
-    <div class="card card-local" onclick="openModal('local')">
+    <div class="card" onclick="openModal('local')">
       <div class="card-icon">📤</div>
       <h3>本地媒体转录</h3>
-      <p>上传本地音视频文件，AI 转录</p>
-      <div class="card-tags"><span>MP3</span><span>WAV</span><span>MP4</span><span>MOV</span></div>
-      <button class="btn-card">选择文件</button>
+      <p>上传本地音视频文件<br>AI 自动转录为文稿</p>
+      <div class="card-tags"><span class="tag green">MP3</span><span class="tag">WAV</span><span class="tag">MP4</span><span class="tag">MOV</span></div>
+      <button class="btn btn-local">📤 选择文件</button>
     </div>
 
-  </section>
+  </div>
 
   <!-- History -->
-  <section class="history-section" id="history-section"></section>
+  <div class="history-section" id="history-section"></div>
 
   <!-- Footer -->
-  <footer class="footer"><p>Video2Doc v0.4.0 · MIT License · 永久免费</p></footer>
+  <div class="footer">Video2Doc v0.4.0 · MIT License · 永久免费</div>
 
-</div></div>
+</div>
 
-<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-<!-- MODAL: Download                                    -->
-<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-<div class="modal-overlay modal-download" id="modal-download" onclick="if(event.target===this)closeModal()">
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<!-- MODAL: Download                                                    -->
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="modal-overlay" id="modal-download" onclick="if(event.target===this)closeModal()">
 <div class="modal-panel">
-  <div class="modal-header">
-    <h3>📥 视频下载</h3>
-    <button class="modal-close" onclick="closeModal()">×</button>
-  </div>
+  <div class="modal-header dl"><h3>📥 视频下载</h3><button class="modal-close" onclick="closeModal()">×</button></div>
   <div class="modal-body">
-    <div class="modal-input">
-      <input type="text" id="dl-url" placeholder="粘贴抖音 / B站 / YouTube 视频链接…" autofocus>
-      <button class="btn btn-dl" id="dl-btn" onclick="startDownload()">下载视频</button>
+    <div class="input-row"><input class="form-control" id="dl-url" placeholder="粘贴抖音 / B站 / YouTube 视频链接…" autofocus><button class="btn-action btn-dl" id="dl-btn" onclick="startDownload()">下载</button></div>
+    <div class="opts-row"><label><input type="checkbox" id="dl-transcribe"> 下载后同时转录为文稿</label></div>
+    <div class="progress-steps" id="dl-steps">
+      <div class="progress-step"><div class="step-icon">🔗</div><div class="step-label">解析链接</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">📥</div><div class="step-label">下载视频</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">✅</div><div class="step-label">完成</div><div class="step-status">等待中</div></div>
     </div>
-    <div class="modal-input-options">
-      <label><input type="checkbox" id="dl-transcribe"> 下载后同时转录为文稿</label>
-    </div>
-    <div class="step-indicator" id="dl-steps">
-      <div class="step"><div class="dot"></div><div class="label">解析链接</div></div>
-      <div class="step"><div class="dot"></div><div class="label">下载视频</div></div>
-      <div class="step"><div class="dot"></div><div class="label">完成</div></div>
-    </div>
-    <div class="progress-section" id="dl-progress">
-      <div class="progress-info"><span id="dl-status">准备中…</span><span id="dl-pct">0%</span></div>
-      <div class="progress-bar-outer"><div class="progress-bar-inner" id="dl-bar"></div></div>
-    </div>
-    <div class="result-section" id="dl-result">
-      <div class="result-content" id="dl-result-text"></div>
-      <div class="result-actions" id="dl-result-actions"></div>
-    </div>
+    <div class="progress-section" id="dl-progress"><div class="progress-info" id="dl-status">准备中…</div><div class="progress-bar-outer"><div class="progress-bar-inner" id="dl-bar"></div></div></div>
+    <div class="result-section" id="dl-result"><div class="result-content active" id="dl-result-text"></div><div class="result-actions" id="dl-result-actions"></div></div>
     <div class="error-msg" id="dl-error"></div>
   </div>
 </div></div>
 
-<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-<!-- MODAL: Transcribe                                  -->
-<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-<div class="modal-overlay modal-transcribe" id="modal-transcribe" onclick="if(event.target===this)closeModal()">
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<!-- MODAL: Transcribe                                                  -->
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="modal-overlay" id="modal-transcribe" onclick="if(event.target===this)closeModal()">
 <div class="modal-panel">
-  <div class="modal-header">
-    <h3>🎙️ 在线视频转录</h3>
-    <button class="modal-close" onclick="closeModal()">×</button>
-  </div>
+  <div class="modal-header tr"><h3>✨ 在线视频转录</h3><button class="modal-close" onclick="closeModal()">×</button></div>
   <div class="modal-body">
-    <div class="modal-input">
-      <input type="text" id="tr-url" placeholder="粘贴抖音 / B站 / YouTube 视频链接…" autofocus>
-      <button class="btn btn-tr" id="tr-btn" onclick="startTranscribe()">开始转录</button>
-    </div>
-    <div class="modal-input-options">
+    <div class="input-row"><input class="form-control" id="tr-url" placeholder="粘贴抖音 / B站 / YouTube 链接…" autofocus><button class="btn-action btn-tr" id="tr-btn" onclick="startTranscribe()">转录</button></div>
+    <div class="opts-row">
       <select id="tr-format"><option value="md">MD 文稿</option><option value="srt">SRT 字幕</option><option value="txt">TXT 文本</option><option value="json">JSON</option><option value="all">全部格式</option></select>
       <select id="tr-domain"><option value="">自动检测领域</option><option value="auto">汽车 🚗</option><option value="tech">科技 💻</option></select>
     </div>
-    <div class="step-indicator" id="tr-steps">
-      <div class="step"><div class="dot"></div><div class="label">解析</div></div>
-      <div class="step"><div class="dot"></div><div class="label">下载</div></div>
-      <div class="step"><div class="dot"></div><div class="label">提取</div></div>
-      <div class="step"><div class="dot"></div><div class="label">转录</div></div>
-      <div class="step"><div class="dot"></div><div class="label">导出</div></div>
+    <div class="progress-steps" id="tr-steps">
+      <div class="progress-step"><div class="step-icon">🔗</div><div class="step-label">解析链接</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">📥</div><div class="step-label">下载视频</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">🎵</div><div class="step-label">提取音频</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">🤖</div><div class="step-label">AI 识别</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">✅</div><div class="step-label">完成</div><div class="step-status">等待中</div></div>
     </div>
-    <div class="progress-section" id="tr-progress">
-      <div class="progress-info"><span id="tr-status">准备中…</span><span id="tr-pct">0%</span></div>
-      <div class="progress-bar-outer"><div class="progress-bar-inner" id="tr-bar"></div></div>
-    </div>
+    <div class="progress-section" id="tr-progress"><div class="progress-info" id="tr-status">准备中…</div><div class="progress-bar-outer"><div class="progress-bar-inner" id="tr-bar"></div></div></div>
     <div class="result-section" id="tr-result">
-      <div class="result-tabs">
-        <button class="result-tab active" onclick="switchTab(this,'tr-txt')">📝 文稿</button>
-        <button class="result-tab" onclick="switchTab(this,'tr-srt')">🎬 SRT 字幕</button>
-      </div>
-      <div class="result-content" id="tr-txt"></div>
-      <div class="result-content" id="tr-srt" style="display:none"></div>
+      <div class="result-tabs"><button class="result-tab active" onclick="switchTab(this,'tr-txt')">📝 文稿</button><button class="result-tab" onclick="switchTab(this,'tr-srt')">🎬 SRT 字幕</button></div>
+      <div class="result-content active" id="tr-txt"></div><div class="result-content" id="tr-srt"></div>
       <div class="result-actions" id="tr-result-actions"></div>
     </div>
     <div class="error-msg" id="tr-error"></div>
   </div>
 </div></div>
 
-<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-<!-- MODAL: Local                                       -->
-<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-<div class="modal-overlay modal-local" id="modal-local" onclick="if(event.target===this)closeModal()">
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<!-- MODAL: Local                                                       -->
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="modal-overlay" id="modal-local" onclick="if(event.target===this)closeModal()">
 <div class="modal-panel">
-  <div class="modal-header">
-    <h3>📤 本地媒体转录</h3>
-    <button class="modal-close" onclick="closeModal()">×</button>
-  </div>
+  <div class="modal-header lo"><h3>📤 本地媒体转录</h3><button class="modal-close" onclick="closeModal()">×</button></div>
   <div class="modal-body">
     <div class="upload-zone" id="upload-zone" onclick="document.getElementById('lo-file').click()"
          ondragover="event.preventDefault();this.classList.add('drag-over')"
          ondragleave="this.classList.remove('drag-over')"
          ondrop="event.preventDefault();this.classList.remove('drag-over');handleDrop(event)">
-      <div class="icon">📁</div>
-      <p>拖拽文件到此处或点击选择</p>
-      <small>支持 MP3 · WAV · MP4 · MOV · MKV · WebM · M4A · AAC · FLAC</small>
-      <small>最大 200MB</small>
+      <div class="icon">📁</div><p>拖拽文件到此处或点击选择</p>
+      <small>MP3 · WAV · MP4 · MOV · MKV · WebM · M4A</small><small>最大 200MB</small>
     </div>
     <input type="file" id="lo-file" accept="audio/*,video/*" style="display:none" onchange="handleFileSelect(this)">
-    <div class="modal-input-options">
+    <div class="opts-row">
       <select id="lo-format"><option value="md">MD 文稿</option><option value="srt">SRT 字幕</option><option value="txt">TXT 文本</option><option value="json">JSON</option><option value="all">全部格式</option></select>
-      <button class="btn btn-lo" id="lo-btn" onclick="startLocalTranscribe()" style="display:none">开始转录</button>
+      <button class="btn-action btn-lo btn-sm" id="lo-btn" onclick="startLocalTranscribe()" style="display:none">开始转录</button>
     </div>
-    <div class="step-indicator" id="lo-steps">
-      <div class="step"><div class="dot"></div><div class="label">上传</div></div>
-      <div class="step"><div class="dot"></div><div class="label">提取</div></div>
-      <div class="step"><div class="dot"></div><div class="label">转录</div></div>
-      <div class="step"><div class="dot"></div><div class="label">导出</div></div>
+    <div class="progress-steps" id="lo-steps">
+      <div class="progress-step"><div class="step-icon">📤</div><div class="step-label">上传文件</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">🎵</div><div class="step-label">提取音频</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">🤖</div><div class="step-label">AI 识别</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">✅</div><div class="step-label">完成</div><div class="step-status">等待中</div></div>
     </div>
-    <div class="progress-section" id="lo-progress">
-      <div class="progress-info"><span id="lo-status">准备中…</span><span id="lo-pct">0%</span></div>
-      <div class="progress-bar-outer"><div class="progress-bar-inner" id="lo-bar"></div></div>
-    </div>
+    <div class="progress-section" id="lo-progress"><div class="progress-info" id="lo-status">准备中…</div><div class="progress-bar-outer"><div class="progress-bar-inner" id="lo-bar"></div></div></div>
     <div class="result-section" id="lo-result">
-      <div class="result-tabs">
-        <button class="result-tab active" onclick="switchTab(this,'lo-txt')">📝 文稿</button>
-        <button class="result-tab" onclick="switchTab(this,'lo-srt')">🎬 SRT 字幕</button>
-      </div>
-      <div class="result-content" id="lo-txt"></div>
-      <div class="result-content" id="lo-srt" style="display:none"></div>
+      <div class="result-tabs"><button class="result-tab active" onclick="switchTab(this,'lo-txt')">📝 文稿</button><button class="result-tab" onclick="switchTab(this,'lo-srt')">🎬 SRT 字幕</button></div>
+      <div class="result-content active" id="lo-txt"></div><div class="result-content" id="lo-srt"></div>
       <div class="result-actions" id="lo-result-actions"></div>
     </div>
     <div class="error-msg" id="lo-error"></div>
@@ -359,237 +352,53 @@ body { font-family: var(--font-sans); background: linear-gradient(135deg, #0D111
 </div></div>
 
 <script>
-let activePoll = null, localFile = null;
+let activePoll=null, localFile=null;
 
-// ─── Modal ────────────────────────────
-function openModal(type) {
-  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
-  document.getElementById('modal-'+type).classList.add('show');
-  const inp = document.getElementById(({download:'dl-url',transcribe:'tr-url',local:'lo-file'})[type]);
-  if (inp && inp.tagName==='INPUT' && inp.type==='text') { inp.value = ''; setTimeout(()=>inp.focus(),100); }
-  resetModal(type);
-}
-function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show')); if(activePoll) clearTimeout(activePoll); }
-function resetModal(prefix) {
-  document.querySelectorAll(`#${prefix}-steps .step`).forEach(s => s.classList.remove('active','done','error'));
-  document.getElementById(prefix+'-progress').classList.remove('show');
-  document.getElementById(prefix+'-result').classList.remove('show');
-  document.getElementById(prefix+'-error').classList.remove('show');
-  ['btn','status','pct','bar'].forEach(x => { const e = document.getElementById(prefix+'-'+x); if(e) { if(x==='bar') e.style.width='0'; else if(e.tagName==='BUTTON') e.disabled=false; } });
-}
+function openModal(t){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show'));const m=document.getElementById('modal-'+t);m.classList.add('show');['dl','tr','lo'].forEach(p=>resetModal(p));const i=document.getElementById({download:'dl-url',transcribe:'tr-url',local:'lo-file'}[t]);if(i&&i.type==='text'){i.value='';setTimeout(()=>i.focus(),100)}}
+function closeModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show'));if(activePoll)clearTimeout(activePoll)}
+function resetModal(p){document.querySelectorAll(`#${p}-steps .progress-step`).forEach(s=>s.classList.remove('active','completed'));document.getElementById(p+'-progress').classList.remove('show');document.getElementById(p+'-result').classList.remove('show');document.getElementById(p+'-error').classList.remove('show');const b=document.getElementById(p+'-btn');if(b)b.disabled=false;const bar=document.getElementById(p+'-bar');if(bar)bar.style.width='0'}
 
-// ─── Download ─────────────────────────
-async function startDownload() {
-  const url = document.getElementById('dl-url').value.trim();
-  if (!url) return alert('请粘贴视频链接');
-  const transcribe = document.getElementById('dl-transcribe').checked;
-  document.getElementById('dl-btn').disabled = true;
-  showProgress('dl', true);
-  updateSteps('dl', 0);
-  activeJob('dl', 'download-video', {url, transcribe}, handleDownloadResult);
-}
-function handleDownloadResult(job) {
-  showProgress('dl', false);
-  document.getElementById('dl-result').classList.add('show');
-  if (job.files && job.files.length) {
-    const f = job.files[0];
-    document.getElementById('dl-result-text').textContent = `✅ 视频已保存: ${f.name} (${formatSize(f.size)})`;
-    document.getElementById('dl-result-actions').innerHTML = `<a href="/api/download/${job.id}/${f.file}" download class="btn btn-dl btn-sm">下载文件</a>`;
-  } else {
-    document.getElementById('dl-result-text').textContent = '✅ 下载完成';
-  }
-  loadHistory();
-}
+// Download
+async function startDownload(){const u=document.getElementById('dl-url').value.trim();if(!u)return alert('请粘贴视频链接');document.getElementById('dl-btn').disabled=true;document.getElementById('dl-progress').classList.add('show');updateSteps('dl',0);const t=document.getElementById('dl-transcribe').checked;activeJob('dl','download-video',{url:u,transcribe:t},r=>{document.getElementById('dl-progress').classList.remove('show');document.getElementById('dl-result').classList.add('show');const f=r.files||[];document.getElementById('dl-result-text').textContent=f.length?`✅ 已保存: ${f[0].name} (${formatSize(f[0].size)})`:'✅ 下载完成';document.getElementById('dl-result-actions').innerHTML=f.map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-dl btn-sm">📥 ${x.name}</a>`).join('');loadHistory()})}
 
-// ─── Online Transcribe ────────────────
-async function startTranscribe() {
-  const url = document.getElementById('tr-url').value.trim();
-  if (!url) return alert('请粘贴视频链接');
-  document.getElementById('tr-btn').disabled = true;
-  showProgress('tr', true);
-  updateSteps('tr', 0);
-  const formats = document.getElementById('tr-format').value;
-  const domain = document.getElementById('tr-domain').value;
-  activeJob('tr', 'transcribe-online', {url, formats, domain}, handleTranscribeResult);
-}
-async function handleTranscribeResult(job) {
-  showProgress('tr', false);
-  document.getElementById('tr-result').classList.add('show');
-  try {
-    const [txt, srt] = await Promise.all([
-      fetch('/api/content/'+job.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),
-      fetch('/api/content/'+job.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')
-    ]);
-    document.getElementById('tr-txt').textContent = txt;
-    document.getElementById('tr-srt').textContent = srt;
-    document.getElementById('tr-result-actions').innerHTML = (job.files||[]).map(f =>
-      `<a href="/api/download/${job.id}/${f.file}" download class="btn btn-outline btn-sm">📥 ${f.name}</a>`
-    ).join('') + `<button class="btn btn-outline btn-sm" onclick="copyText('${escapeHtml(txt)}')">📋 复制</button>`;
-  } catch(e) {}
-  loadHistory();
-}
+// Transcribe
+async function startTranscribe(){const u=document.getElementById('tr-url').value.trim();if(!u)return alert('请粘贴视频链接');document.getElementById('tr-btn').disabled=true;document.getElementById('tr-progress').classList.add('show');updateSteps('tr',0);const f=document.getElementById('tr-format').value,d=document.getElementById('tr-domain').value;activeJob('tr','transcribe-online',{url:u,formats:f,domain:d},async r=>{document.getElementById('tr-progress').classList.remove('show');document.getElementById('tr-result').classList.add('show');try{const[t,s]=await Promise.all([fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),fetch('/api/content/'+r.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')]);document.getElementById('tr-txt').textContent=t;document.getElementById('tr-srt').textContent=s;document.getElementById('tr-result-actions').innerHTML=(r.files||[]).map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-tr btn-sm">📥 ${x.name}</a>`).join('')+`<button class="btn-action btn-sm btn-tr" onclick="copyText('${escapeHtml(t)}')">📋 复制</button>`}catch(e){}loadHistory()})}
 
-// ─── Local Transcribe ─────────────────
-function handleDrop(e) { const f = e.dataTransfer.files[0]; if (f) selectFile(f); }
-function handleFileSelect(input) { const f = input.files[0]; if (f) selectFile(f); }
-function selectFile(file) {
-  if (file.size > 200*1024*1024) return alert('文件超过 200MB 限制');
-  localFile = file;
-  const zone = document.getElementById('upload-zone');
-  zone.classList.add('file-selected');
-  zone.innerHTML = `<div class="file-info"><span class="name">📄 ${file.name}</span><span class="size">${formatSize(file.size)}</span><button class="btn btn-sm btn-outline" onclick="clearFile()">移除</button></div>`;
-  document.getElementById('lo-btn').style.display = 'inline-block';
-}
-function clearFile() {
-  localFile = null;
-  document.getElementById('lo-btn').style.display = 'none';
-  const zone = document.getElementById('upload-zone');
-  zone.classList.remove('file-selected');
-  zone.innerHTML = '<div class="icon">📁</div><p>拖拽文件到此处或点击选择</p><small>支持 MP3 · WAV · MP4 · MOV · MKV</small><small>最大 200MB</small>';
-}
-async function startLocalTranscribe() {
-  if (!localFile) return alert('请先选择文件');
-  document.getElementById('lo-btn').disabled = true;
-  showProgress('lo', true);
-  updateSteps('lo', 0);
-  const form = new FormData();
-  form.append('file', localFile);
-  form.append('formats', document.getElementById('lo-format').value);
-  try {
-    const r = await fetch('/api/transcribe-local', {method:'POST', body:form});
-    const d = await r.json();
-    if (d.error) { showError('lo', d.error); return; }
-    activeJob('lo', null, null, handleTranscribeResultLocal, d.job_id);
-  } catch(e) { showError('lo', '连接失败'); }
-}
-async function handleTranscribeResultLocal(job) {
-  showProgress('lo', false);
-  document.getElementById('lo-result').classList.add('show');
-  try {
-    const [txt, srt] = await Promise.all([
-      fetch('/api/content/'+job.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),
-      fetch('/api/content/'+job.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')
-    ]);
-    document.getElementById('lo-txt').textContent = txt;
-    document.getElementById('lo-srt').textContent = srt;
-    document.getElementById('lo-result-actions').innerHTML = (job.files||[]).map(f =>
-      `<a href="/api/download/${job.id}/${f.file}" download class="btn btn-outline btn-sm">📥 ${f.name}</a>`
-    ).join('') + `<button class="btn btn-outline btn-sm" onclick="copyText('${escapeHtml(txt)}')">📋 复制</button>`;
-  } catch(e) {}
-  loadHistory();
-}
+// Local
+function handleDrop(e){const f=e.dataTransfer.files[0];if(f)selectFile(f)}
+function handleFileSelect(i){const f=i.files[0];if(f)selectFile(f)}
+function selectFile(f){if(f.size>200*1024*1024)return alert('文件超过 200MB 限制');localFile=f;const z=document.getElementById('upload-zone');z.classList.add('file-selected');z.innerHTML=`<div class="file-info"><span class="name">📄 ${f.name}</span><span class="size">${formatSize(f.size)}</span><button class="btn-action btn-sm btn-local" onclick="clearFile()">移除</button></div>`;document.getElementById('lo-btn').style.display='inline-block'}
+function clearFile(){localFile=null;document.getElementById('lo-btn').style.display='none';const z=document.getElementById('upload-zone');z.classList.remove('file-selected');z.innerHTML='<div class="icon">📁</div><p>拖拽文件到此处或点击选择</p><small>MP3 · WAV · MP4 · MOV · MKV · WebM · M4A</small><small>最大 200MB</small>'}
+async function startLocalTranscribe(){if(!localFile)return alert('请先选择文件');document.getElementById('lo-btn').disabled=true;document.getElementById('lo-progress').classList.add('show');updateSteps('lo',0);const fd=new FormData();fd.append('file',localFile);fd.append('formats',document.getElementById('lo-format').value);try{const r=await fetch('/api/transcribe-local',{method:'POST',body:fd});const d=await r.json();if(d.error){showError('lo',d.error);return}activeJob('lo',null,null,async r=>{document.getElementById('lo-progress').classList.remove('show');document.getElementById('lo-result').classList.add('show');try{const[t,s]=await Promise.all([fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),fetch('/api/content/'+r.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')]);document.getElementById('lo-txt').textContent=t;document.getElementById('lo-srt').textContent=s;document.getElementById('lo-result-actions').innerHTML=(r.files||[]).map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-lo btn-sm">📥 ${x.name}</a>`).join('')+`<button class="btn-action btn-sm btn-lo" onclick="copyText('${escapeHtml(t)}')">📋 复制</button>`}catch(e){}loadHistory()},d.job_id)}catch(e){showError('lo','连接失败')}}
 
-// ─── Shared Logic ─────────────────────
-async function activeJob(prefix, endpoint, body, onDone, overrideJobId) {
-  let jobId = overrideJobId;
-  if (!jobId) {
-    try {
-      const r = await fetch('/api/'+(endpoint||'process'), {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
-      const d = await r.json();
-      if (d.error) { showError(prefix, d.error); return; }
-      jobId = d.job_id;
-    } catch(e) { showError(prefix, '连接失败'); return; }
-  }
-  const poll = async () => {
-    try {
-      const r = await fetch('/api/status/'+jobId);
-      const job = await r.json();
-      updateSteps(prefix, job.status);
-      setProgress(prefix, job.progress, job.status);
-      if (job.status === 'done') { onDone(job); activePoll = null; return; }
-      if (job.status === 'error') { showError(prefix, job.error||'未知错误'); return; }
-      activePoll = setTimeout(poll, 1000);
-    } catch(e) { activePoll = setTimeout(poll, 2000); }
-  };
+// Shared polling
+async function activeJob(p,ep,body,onDone,oid){
+  let jid=oid;
+  if(!jid){try{const r=await fetch('/api/'+(ep||'process'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const d=await r.json();if(d.error){showError(p,d.error);return}jid=d.job_id}catch(e){showError(p,'连接失败');return}}
+  const poll=async()=>{try{const r=await fetch('/api/status/'+jid);const j=await r.json();updateSteps(p,j.status);setProgress(p,j.progress,j.status);if(j.status==='done'){onDone(j);activePoll=null;return}if(j.status==='error'){showError(p,j.error||'未知错误');return}activePoll=setTimeout(poll,1000)}catch(e){activePoll=setTimeout(poll,2000)}};
   poll();
 }
-function updateSteps(prefix, status) {
-  const mapping = {dl:{queued:'解析',resolving:'解析',downloading:'下载',done:'完成',error:'error'}, tr:{queued:'解析',resolving:'解析',downloading:'下载',extracting:'提取',transcribing:'转录',exporting:'导出',done:'done',error:'error'}, lo:{queued:'上传',extracting:'提取',transcribing:'转录',exporting:'导出',done:'done',error:'error'}};
-  const steps = mapping[prefix] || {};
-  const stages = Object.keys(steps).filter(k => k !== 'done' && k !== 'error');
-  let passedDone = false;
-  stages.forEach((stage, i) => {
-    const el = document.querySelector(`#${prefix}-steps .step:nth-child(${i+1})`);
-    if (!el) return;
-    el.classList.remove('active','done','error');
-    if (status === 'done' && !passedDone) { el.classList.add('done'); passedDone = true; }
-    else if (status === 'error' && i === stages.length-1) { el.classList.add('error'); }
-    else if (stage === status || steps[status] === steps[stage]) { el.classList.add('active'); passedDone = true; }
-    else if (!passedDone) { el.classList.add('done'); }
-  });
-  if (status === 'done') document.querySelectorAll(`#${prefix}-steps .step`).forEach(s => s.classList.add('done'));
+const stepMap={dl:['解析链接','下载视频','完成'],tr:['解析链接','下载视频','提取音频','AI识别','完成'],lo:['上传文件','提取音频','AI识别','完成']};
+const statusIdx={resolving:0,downloading:1,extracting:2,transcribing:3,exporting:4};
+function updateSteps(p,s){
+  const steps=stepMap[p],si=s==='done'?steps.length-1:s==='error'?-1:statusIdx[s]??-1;
+  document.querySelectorAll(`#${p}-steps .progress-step`).forEach((el,i)=>{el.classList.remove('active','completed');if(si>=0){if(i<si)el.classList.add('completed');if(i===si)el.classList.add('active')}if(s==='done')el.classList.add('completed')});
 }
-function setProgress(prefix, pct, status) {
-  const statusMap = {resolving:'解析中',downloading:'下载中',extracting:'提取中',transcribing:'转录中',exporting:'导出中',done:'完成',error:'失败'};
-  document.getElementById(prefix+'-status').innerHTML = `<span class="spinner"></span> ${statusMap[status]||status}`;
-  document.getElementById(prefix+'-pct').textContent = pct + '%';
-  document.getElementById(prefix+'-bar').style.width = pct + '%';
-}
-function showProgress(prefix, show) { document.getElementById(prefix+'-progress').classList.toggle('show', show); }
-function showError(prefix, msg) {
-  document.getElementById(prefix+'-btn') && (document.getElementById(prefix+'-btn').disabled = false);
-  showProgress(prefix, false);
-  const el = document.getElementById(prefix+'-error');
-  el.textContent = '❌ ' + msg;
-  el.classList.add('show');
-}
-function switchTab(btn, contentId) {
-  btn.parentElement.querySelectorAll('.result-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  btn.parentElement.parentElement.querySelectorAll('.result-content').forEach(c => c.style.display='none');
-  document.getElementById(contentId).style.display = 'block';
-}
+function setProgress(p,pct,s){document.getElementById(p+'-status').textContent=s==='done'?'✅ 完成':s==='error'?'❌ 失败':'⏳ 处理中 '+pct+'%';document.getElementById(p+'-bar').style.width=pct+'%'}
+function showError(p,msg){const b=document.getElementById(p+'-btn');if(b)b.disabled=false;document.getElementById(p+'-progress').classList.remove('show');const e=document.getElementById(p+'-error');e.textContent='❌ '+msg;e.classList.add('show')}
+function switchTab(btn,cid){btn.parentElement.querySelectorAll('.result-tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');btn.parentElement.parentElement.querySelectorAll('.result-content').forEach(c=>c.classList.remove('active'));document.getElementById(cid).classList.add('active')}
 
-// ─── Utils ────────────────────────────
-function formatSize(b) { return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
-function escapeHtml(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); alert('已复制到剪贴板'); }
-  catch(e) {
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta); ta.select();
-    document.execCommand('copy'); document.body.removeChild(ta); alert('已复制');
-  }
-}
+// Utils
+function formatSize(b){return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'}
+function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+async function copyText(t){try{await navigator.clipboard.writeText(t);alert('已复制')}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('已复制')}}
 
-// ─── History ──────────────────────────
-async function loadHistory() {
-  try {
-    const r = await fetch('/api/history');
-    const data = await r.json();
-    const types = {download:'📥',transcribe_online:'🎙️',transcribe_local:'📤'};
-    document.getElementById('history-section').innerHTML = data.length ? '<h3>最近处理</h3><div class="history-list">' +
-      data.slice(0,8).map(j => `<div class="history-item" onclick="viewHistory('${j.id}','${j.type}')"><span class="hist-icon">${types[j.type]||'📄'}</span><span class="hist-title">${j.title||j.url||'(无标题)'}</span><span class="hist-time">${j.duration||''}</span></div>`).join('') +
-    '</div>' : '';
-  } catch(e) {}
-}
-async function viewHistory(jid, type) {
-  const modalType = type === 'download' ? 'download' : type === 'transcribe_local' ? 'local' : 'transcribe';
-  openModal(modalType);
-  try {
-    const r = await fetch('/api/status/'+jid);
-    const job = await r.json();
-    if (job.status === 'done') {
-      const fn = modalType==='download'?handleDownloadResult:modalType==='local'?handleTranscribeResultLocal:handleTranscribeResult;
-      fn(job);
-    } else {
-      const prefix = {download:'dl',transcribe:'tr',local:'lo'}[modalType];
-      showError(prefix, '该任务未完成');
-    }
-  } catch(e) { console.error(e); }
-}
+// History
+async function loadHistory(){try{const r=await fetch('/api/history');const d=await r.json();const types={download:'📥',transcribe_online:'✨',transcribe_local:'📤'};document.getElementById('history-section').innerHTML=d.length?'<h4>最近处理</h4><div class="history-list">'+d.slice(0,8).map(j=>`<div class="history-item" onclick="viewHistory('${j.id}','${j.type}')"><span class="hist-icon">${types[j.type]||'📄'}</span><span class="hist-title">${j.title||j.url||'(无标题)'}</span><span class="hist-time">${j.duration||''}</span></div>`).join('')+'</div>':''}catch(e){}}
+async function viewHistory(jid,type){const mt=type==='download'?'download':type==='transcribe_local'?'local':'transcribe';openModal(mt);try{const r=await fetch('/api/status/'+jid);const j=await r.json();if(j.status==='done'){const h=mt==='download'?r=>{document.getElementById('dl-result').classList.add('show');document.getElementById('dl-result-text').textContent='✅ 已下载'}:mt==='local'?async r=>{document.getElementById('lo-result').classList.add('show');try{const t=await fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'');document.getElementById('lo-txt').textContent=t}catch(e){}}:async r=>{document.getElementById('tr-result').classList.add('show');try{const t=await fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'');document.getElementById('tr-txt').textContent=t}catch(e){}};h(j)}else{showError({download:'dl',transcribe:'tr',local:'lo'}[mt],'该任务未完成')}}catch(e){}}
 
-// ─── Init ─────────────────────────────
 loadHistory();
-
-// Keyboard shortcuts
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-  if (e.key === 'Enter') {
-    if (document.getElementById('modal-download').classList.contains('show')) startDownload();
-    else if (document.getElementById('modal-transcribe').classList.contains('show')) startTranscribe();
-  }
-});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if(e.key==='Enter'){if(document.getElementById('modal-download').classList.contains('show'))startDownload();else if(document.getElementById('modal-transcribe').classList.contains('show'))startTranscribe()}});
 </script>
 </body>
 </html>
