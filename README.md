@@ -1,135 +1,193 @@
 # Video2Doc
 
-> AI Agent Skill + CLI 工具——将视频（抖音/小红书/B站/YouTube）转化为结构化文档。
+> 视频转文档工具 — AI Agent Skill + CLI + Web 可视化界面。  
+> Mac / Windows / Linux 全平台支持。
 
-## 这是什么
+---
 
-Video2Doc 既是一个 **AI Agent Skill**，也是一个独立的 **CLI 工具**。既可以加载到 Agent 中自动执行，也可以直接在终端运行。
-
-**两种输出模式**：
-
-| 模式 | 输出 | 说明 |
-|------|------|------|
-| 📝 **纯文稿**（默认） | `transcript.md` | 校正文本 + 逐段对照表 + 要点提炼 |
-| 🎨 **深度分析** | `index.html` | 离线 HTML，分章 + SVG 图解 + 一键导出 MD/DOCX/长截图 |
-
-## 快速开始
-
-### Mac / Linux
+## 快速开始（30 秒）
 
 ```bash
 git clone https://github.com/GoodWay0223/Video2Doc.git
 cd Video2Doc
-bash scripts/check_setup.sh                    # 环境检查
-
-export SILICONFLOW_API_KEY=sk-xxxxx             # 配置 API Key
-python3 webui.py                                # 🆕 启动可视化界面
+python3 scripts/check_setup.py          # 🆕 跨平台自检（Python 实现）
+python3 webui.py                         # 启动 Web 界面
 ```
 
-打开 `http://localhost:8765`，粘贴链接即可转录。
+浏览器打开 `http://localhost:8765`，粘贴链接即可转录。
 
-CLI 模式也支持：
+> Tip: `python3 webui.py --check-only` 仅做环境检查不启动服务。  
+> Tip: `python3 webui.py --no-check` 跳过自检直接启动。
+
+---
+
+## 系统兼容性
+
+| 功能 | Mac | Windows | Linux |
+|------|-----|---------|-------|
+| Web UI (`webui.py`) | ✅ Python3 即可 | ✅ Python3 即可 | ✅ Python3 即可 |
+| 环境自检 (`scripts/check_setup.py`) | ✅ 跨平台 Python | ✅ 跨平台 Python | ✅ 跨平台 Python |
+| CLI (`video2doc.sh`) | ✅ | ⚠️ 需 Git Bash | ✅ |
+| Agent Skill | ✅ WorkBuddy 等 | ✅ WorkBuddy 等 | ✅ WorkBuddy 等 |
+
+**核心原则**：整个项目的 **唯一入口** 是 `python3 webui.py`，Mac 和 Windows 运行方式完全相同。所有 .sh 脚本都是辅助工具，Web UI 和 Python 脚本不依赖它们。
+
+---
+
+## 📋 安装教程
+
+### 第一步：安装 Python 3.9+
+
+| 系统 | 方式 |
+|------|------|
+| **Mac** | 系统自带 `python3`，或 `brew install python3` |
+| **Windows** | [python.org](https://python.org) 下载安装，勾选 "Add Python to PATH" |
+| **Linux** | `sudo apt install python3` |
+
+### 第二步：安装 ffmpeg（音频处理必需）
+
+| 系统 | 命令 |
+|------|------|
+| **Mac** | `brew install ffmpeg` |
+| **Windows** | `winget install ffmpeg` 或下载 [ffmpeg.org](https://ffmpeg.org) |
+| **Linux** | `sudo apt install ffmpeg` |
+
+### 第三步（可选）：安装 yt-dlp（非抖音平台下载）
 
 ```bash
-./video2doc.sh "https://v.douyin.com/xxxx"      # 命令行转录
-./video2doc.sh --batch links.txt --format all   # 批量处理
+pip install yt-dlp
 ```
 
-### 🪟 Windows
-
-安装 [Git for Windows](https://git-scm.com/download/win) 和 [Python 3.9+](https://python.org)：
+### 第四步：配置 API Key（转录功能必需）
 
 ```bash
-# Git Bash 终端中
-git clone https://github.com/GoodWay0223/Video2Doc.git
-cd Video2Doc
-bash scripts/check_setup.sh
+# 方式 1: 环境变量（推荐）
+# Mac/Linux:
+export SILICONFLOW_API_KEY=sk-xxxxx
+# Windows CMD:
+set SILICONFLOW_API_KEY=sk-xxxxx
 
-set SILICONFLOW_API_KEY=sk-xxxxx                 # CMD 中设置环境变量
-# 或 Git Bash: export SILICONFLOW_API_KEY=sk-xxxxx
-
-python webui.py                                  # 启动可视化界面
+# 方式 2: 配置文件
+mkdir -p ~/.video2doc
+echo '{"siliconflow_api_key":"sk-xxxxx"}' > ~/.video2doc/config.json
 ```
 
-> Windows 下需要额外安装 ffmpeg：`winget install ffmpeg` 或 `choco install ffmpeg`
+> 🔑 注册链接：https://cloud.siliconflow.cn/i/pWcvZzOr（免费 10 小时/月）
 
-## 兼容的 Agent
+### 第五步：运行环境检查
 
-| Agent | 状态 |
-|-------|------|
-| WorkBuddy | ✅ 主要开发与测试平台 |
-| OpenCLaw | ✅ 兼容 |
-| Claude Code / Cline | ✅ 兼容 |
-| Codex CLI | ✅ 兼容 |
+```bash
+python3 scripts/check_setup.py
+# 或
+python3 webui.py --check-only
+```
 
-## 功能
+输出示例：
+```
+  系统: macOS
+  Python: Python 3.13.12
 
-- **多平台支持**：抖音、小红书、B站、YouTube
-- **三级智能转录**：TeleSpeechASR（首选）→ SenseVoiceSmall → 本地 Whisper
-- **多格式输出**：SRT 字幕 / JSON 结构化 / TXT 纯文本 / Markdown
-- **内容分析**：按视频自然结构分章，提炼问题/陷阱/步骤/结论
-- **SVG 图解**：按内容类型动态生成（流程/关系/时间线/对比/决策树/因果链）
-- **关键帧抽取**：界面类视频每章抽一帧作为视觉实证
-- **离线 HTML**：单页自包含，内联 CSS/SVG，截图相对路径
-- **一键导出**：深度分析 HTML 内置导出按钮（Markdown / DOCX / 长截图）
-- **纯文稿模式**：校正后的自然段落 + 逐段对照表 + 信息提炼
-- **批量处理**：`--batch links.txt` 一次处理多个链接
-- **智能校正**：内置规则库自动修正常见 ASR 错误
-- **跨 Agent 配置**：API Key 支持环境变量 / `~/.video2doc/config.json` / WorkBuddy 兼容
-- **🆕 Web 可视化界面**：`python3 webui.py` 启动本地服务，浏览器操作，不需要命令行知识
+  ✅ FFmpeg (音频处理): /usr/local/bin/ffmpeg
+  ✅ curl (API 请求): curl
+  ✅ yt-dlp (视频下载): yt-dlp
+  ✅ API Key: sk-zrcjwfs...sgwhd
 
-## 通过 Agent 安装
+  ✅ 所有核心依赖就绪，可以正常使用。
+```
 
-直接对 AI Agent 说一句话即可安装：
+如果某项显示 ❌，按提示安装对应工具后再运行一次检查。
+
+---
+
+## 三种使用方式
+
+### 1. Web 可视化界面（推荐）
+
+```bash
+python3 webui.py
+# 浏览器打开 http://localhost:8765
+```
+
+三个功能：
+- 📥 **视频下载** — 输入链接下载原视频
+- 🎙️ **在线转录** — 输入链接 AI 转录为文稿
+- 📤 **本地转录** — 上传本地文件 AI 转录
+
+### 2. CLI 命令行
+
+```bash
+./video2doc.sh "https://v.douyin.com/xxxx"       # 单视频
+./video2doc.sh --batch links.txt --format all     # 批量处理
+```
+
+### 3. Agent Skill
+
+直接对 AI Agent 说：
 
 | Agent | 安装提示词 |
 |-------|-----------|
 | **WorkBuddy** | `帮我安装 Video2Doc skill，仓库是 https://github.com/GoodWay0223/Video2Doc` |
 | **其他 Agent** | `从 https://github.com/GoodWay0223/Video2Doc 安装 Video2Doc` |
 
-## 配置 API Key
+---
 
-三种方式，任选其一（优先级从左到右）：
+## 🪟 Windows 特别说明
 
-```bash
-# 方式 1: 环境变量（推荐，跨 Agent 通用）
-export SILICONFLOW_API_KEY=sk-xxxxx
+在 Windows 上，唯一需要额外安装的是 **Git for Windows**（如果要用 CLI 脚本）或仅装 **Python 3.9+**（如果只用 Web UI）。
 
-# 方式 2: 配置文件（机器级）
-mkdir -p ~/.video2doc
-echo '{"siliconflow_api_key":"sk-xxxxx"}' > ~/.video2doc/config.json
+推荐方案：
+1. 安装 [Python](https://python.org)（勾选 "Add Python to PATH"）
+2. 安装 [ffmpeg](https://ffmpeg.org)（下载后解压，将 `bin/` 加入 PATH）
+3. 打开 CMD 或 PowerShell，运行：
+   ```
+   cd Video2Doc
+   python scripts/check_setup.py
+   python webui.py
+   ```
 
-# 方式 3: WorkBuddy 自动存储（向后兼容）
-# Agent 会自动写入 ~/.workbuddy/MEMORY.md
-```
+无需安装 Git Bash、WSL 或任何 Linux 模拟层。Web UI 完全是跨平台的。
 
-> 注册链接：https://cloud.siliconflow.cn/i/pWcvZzOr（免费 10 小时/月）
+---
+
+## 功能列表
+
+- **三大核心功能**：视频下载 / 在线转录 / 本地转录
+- **多平台支持**：抖音 / B站 / YouTube
+- **三级智能转录**：TeleSpeechASR → SenseVoiceSmall → 本地 Whisper
+- **多格式输出**：SRT 字幕 / JSON / TXT / Markdown
+- **内容深度分析**：自动分章 + SVG 图解 + 关键帧截图
+- **智能校正规则库**：自动修复常见 ASR 错误
+- **跨 Agent 配置**：环境变量 / 配置文件 / WorkBuddy 三来源
+
+---
 
 ## 目录结构
 
 ```
 Video2Doc/
-├── video2doc.sh              # CLI 入口（单视频/批量）
-├── webui.py                   # 🆕 Web 可视化界面入口
-├── SKILL.md                  # Agent Skill 完整工作流
-├── README.md                 # 本文件
-├── CHANGELOG.md              # 版本记录
-├── scripts/                  # 可执行脚本
-│   ├── check_setup.sh        # 🆕 环境自检
-│   ├── load_config.sh        # 🆕 跨 Agent 配置加载
-│   ├── export_formats.py     # 🆕 多格式导出 (SRT/JSON/TXT/MD)
-│   ├── apply_corrections.py  # 🆕 转录校正规则应用
-│   ├── download_video.sh     # yt-dlp 下载
-│   ├── extract_audio.sh      # 音频提取 + 校验
-│   ├── transcribe.sh         # Whisper 转录
-│   ├── extract_frames.sh     # 关键帧抽帧
-│   └── verify_html.py        # HTML 验证
-├── references/               # 参考文档
-│   ├── corrections.json      # 🆕 转录校正规则库
-│   ├── svg_guidelines.md     # SVG 图解指南
-│   └── prerequisites.md      # 环境依赖详解
-└── assets/
-    └── template.html         # HTML 模板
+├── webui.py                    # Web UI 入口（Mac/Win/Linux 通用）
+├── video2doc.sh                # CLI 入口
+├── SKILL.md                    # Agent Skill 工作流
+├── README.md                   # 本文件
+├── CHANGELOG.md
+├── scripts/
+│   ├── check_setup.py          # 🆕 跨平台环境自检（Python）
+│   ├── check_setup.sh          # 环境自检（Shell 版）
+│   ├── load_config.sh          # 配置加载
+│   ├── export_formats.py       # 多格式导出
+│   ├── apply_corrections.py    # 校正规则应用
+│   └── ...
+├── webui/                      # Web UI 后端包
+│   ├── server.py
+│   ├── pipeline.py
+│   ├── job_manager.py
+│   ├── templates.py
+│   └── static/
+│       └── index.html          # 前端页面
+├── references/
+│   ├── corrections.json        # 校正规则库
+│   └── ...
+└── output/                     # 输出目录（运行时生成）
 ```
 
 ## License

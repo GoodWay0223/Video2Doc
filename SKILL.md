@@ -934,7 +934,8 @@ For cloud API, source `scripts/load_config.sh` (env var → ~/.video2doc/config.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/check_setup.sh` | Environment health check (all deps + API key) |
+| `scripts/check_setup.sh` | Environment health check (bash, Mac/Linux) |
+| `scripts/check_setup.py` | 🆕 跨平台环境自检 (Python, Win/Mac/Linux) — `python3 scripts/check_setup.py` |
 | `scripts/load_config.sh` | Cross-Agent API key loader (source to get `$SILICONFLOW_API_KEY`) |
 | `scripts/export_formats.py` | Convert TeleSpeechASR output → SRT/TXT/JSON/MD |
 | `scripts/apply_corrections.py` | Apply `references/corrections.json` rules to fix ASR errors |
