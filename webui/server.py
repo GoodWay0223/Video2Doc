@@ -120,11 +120,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
             also_transcribe = data.get('transcribe', False)
             if also_transcribe:
-                def download_then_transcribe():
-                    pipeline.run_download_pipeline(job)
-                    if job.status == "done":
-                        pipeline.run_transcribe_pipeline(job)
-                threading.Thread(target=download_then_transcribe, daemon=True).start()
+                # When "also transcribe" is checked, run the full transcribe pipeline
+                # (which includes download) instead of separate download + transcribe
+                job.type = job_manager.JobType.TRANSCRIBE_ONLINE
+                threading.Thread(target=pipeline.run_transcribe_pipeline, args=(job,), daemon=True).start()
             else:
                 threading.Thread(target=pipeline.run_download_pipeline, args=(job,), daemon=True).start()
             self._send_json({"job_id":job.id,"status":"queued"})

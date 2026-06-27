@@ -7,11 +7,26 @@ from .job_manager import Job, JobType, OUTPUT_DIR
 IS_WINDOWS = os.name == 'nt'
 
 def find_executable(names):
+    """Find the first available executable.
+    Handles: bare names (ffmpeg), .exe variants (ffmpeg.exe),
+    and absolute paths (/usr/local/bin/ffmpeg).
+    """
     for name in names:
+        # Check absolute/relative path directly
+        if '/' in name or '\\' in name:
+            if Path(name).exists() and Path(name).is_file():
+                return name
+            continue
+        # Check PATH via which
         if shutil.which(name):
             return name
-        if IS_WINDOWS and shutil.which(name + '.exe'):
-            return name + '.exe'
+        if IS_WINDOWS:
+            exe = name + '.exe'
+            if shutil.which(exe):
+                return exe
+            for base in [os.environ.get('LOCALAPPDATA', ''), os.environ.get('PROGRAMFILES', ''), 'C:\\Program Files']:
+                c = Path(base) / exe
+                if c.exists(): return str(c)
     return None
 
 def _get_api_key():
