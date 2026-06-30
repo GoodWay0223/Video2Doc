@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.4.1] — 2026-06-30
+
+### Fixed
+- **结果内容读取回退**：修复转录任务只选 MD 格式时，前端「文稿 Tab」读取 `/api/content/{id}/text` 返回"内容不存在"的问题
+  - `text` 类型自动回退到 `transcript.md`
+  - `md` 类型自动回退到 `transcript.txt`
+  - `srt` 在无 .srt 文件时，从原始 `tele_result.json` 实时生成
+- **启动自检**：`webui.py` 启动时自动运行跨平台环境检查（`--no-check` 可跳过）
+
+### Verified
+- 后端 14 个模块函数导入正常
+- 三种 Job 类型（download / transcribe_online / transcribe_local）创建与状态流转正常
+- 本地转录端到端实测通过（上传 → 提取音频 → TeleSpeechASR → 导出 MD/SRT）
+- 三个 API 端点接受请求、历史记录正确归类
+
 ## [v0.4.0] — 2026-06-26
 
 ### Added
