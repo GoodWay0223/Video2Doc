@@ -244,6 +244,7 @@ def run_download_pipeline(job):
     """Pure download pipeline"""
     try:
         job.status = "resolving"; job.progress = 20
+        job.status = "downloading"; job.progress = 50
         video = download_video_only(job)
         if not video:
             job.status = "error"; job.error = "下载失败"

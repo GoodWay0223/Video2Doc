@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video2Doc Web UI v0.4.0 — 本地可视化前端
+Video2Doc Web UI v0.4.2 — 本地可视化前端
 Run: python3 webui.py
 Open: http://localhost:8765
 
@@ -40,7 +40,7 @@ def main():
     server = http.server.HTTPServer(('0.0.0.0', port), Handler)
     print(f"""
 ╔══════════════════════════════════════════╗
-║   🎬 Video2Doc 工坊 v0.4.0               ║
+║   🎬 Video2Doc 工坊 v0.4.2               ║
 ║                                          ║
 ║   打开: http://localhost:{port}              ║
 ║   按 Ctrl+C 停止                           ║
