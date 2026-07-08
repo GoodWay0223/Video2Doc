@@ -1,5 +1,34 @@
 # Changelog
 
+## [v0.4.3] — 2026-07-08
+
+### Added
+- **豆包录音文件识别大模型 2.0（云端首选）**：接入火山引擎豆包 ASR，实测中文准确率 78%，
+  显著优于 TeleSpeechASR（22%）。异步 submit+query、base64 内联音频、自带标点+ITN+词级时间戳。
+  严格按官方文档处理响应头 `X-Api-Status-Code`（20000000 成功 / 20000001·2 处理中排队 /
+  20000003 静音 / 4xxxxx·5xxxxx 错误），捕获 `X-Tt-Logid` 便于排错。
+  用 `urllib` 而非 curl（规避 ARG_MAX 限制、可直接读响应头）。
+- **引擎选择机制（默认自动 + 手动可选）**：`transcribe()` 按 `job.engine` 选引擎。
+  - `auto`（默认）：豆包 → TeleSpeechASR → FunASR → Whisper 自动降级，首选额度耗尽/不稳定时
+    静默切下一级，结果区显示「🤖 已自动切换到 tele（doubao 不可用）」。
+  - 手动指定 `doubao`/`tele`/`funasr`/`whisper`：仅用该引擎，失败提示「可切换其他引擎重试」。
+- **本地 FunASR (Paraformer) 引擎**：作为本地首选（优先于 Whisper），中文更快更准、自带 VAD+标点+ITN，
+  自动检测 cuda/cpu。Whisper 降为末位兜底。
+- **前端引擎选择器**：在线/本地转录弹窗各加「引擎」下拉 + 结果区引擎徽章。
+- **B站 AI 字幕自动下载说明**：文档补明 `--write-subs` 会拉 `ai-zh` 等多语种字幕，可作 ASR 兜底。
+- **豆包 X-Api-Key 获取路径文档**：新版控制台 → API 密钥管理（console.volcengine.com/speech/new/setting/apikeys）。
+
+### Changed
+- 转录链路改为 5 级：豆包(bigmodel 2.0) → TeleSpeechASR → SenseVoiceSmall → 本地 FunASR → 本地 Whisper。
+- `Job` 新增 `engine`/`engine_used`/`engine_note` 字段；三处转录接口接受 `engine` 参数。
+- import 守卫从 `except ImportError` 改为 `except Exception`（torch 在 macOS 未签名抛 OSError，原写法会崩）。
+
+### Verified
+- 3 个 py 文件语法 OK + webui 包导入 OK
+- 引擎选择逻辑测试全正确（auto 全失败 / 强制引擎失败 / 未知引擎 / auto 降级 + engine_note）
+- 豆包独立测试矩阵 4/4 通过（new 鉴权 × url/base64）；B站 6:43 音频 ~35s 完成、75 段、末段 402s
+- 豆包 vs TeleSpeechASR 准确率对比：9 关键术语 7/9 vs 2/9
+
 ## [v0.4.2] — 2026-07-02
 
 ### Fixed

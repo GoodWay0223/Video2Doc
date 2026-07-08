@@ -1,6 +1,6 @@
 ---
 name: Video2Doc
-description: "Video2Doc converts videos (Douyin, Xiaohongshu, Bilibili, YouTube) into structured documentation — a clean transcript by default, with optional deep analysis mode. Handles downloading (yt-dlp + Playwright MediaRecorder with anti-bot strategy), one-step audio extraction, 3-tier transcription (TeleSpeechASR cloud API → SenseVoiceSmall → local Whisper), content chaptering, SVG generation, and parallel batch processing for multiple videos."
+description: "Video2Doc converts videos (Douyin, Xiaohongshu, Bilibili, YouTube) into structured documentation — a clean transcript by default, with optional deep analysis mode. Handles downloading (yt-dlp + Playwright MediaRecorder with anti-bot strategy), one-step audio extraction, 5-tier transcription with engine selection (Doubao bigmodel cloud → TeleSpeechASR → SenseVoiceSmall → local FunASR → local Whisper), content chaptering, SVG generation, and parallel batch processing for multiple videos."
 agent_created: true
 ---
 
@@ -43,7 +43,7 @@ preference), ALWAYS present this guide before doing anything else:**
 
 在开始之前，需要先配置语音转录引擎。两种选择：
 - ☁️ **云端（推荐）**：硅基流动免费 API，速度快、精度高、不占本机算力
-- 💻 **本地**：使用 Whisper 在本机运行，完全离线，但需下载 1.5GB 模型
+- 💻 **本地**：优先 FunASR（Paraformer，中文更快更准、自带标点，~300MB）；Whisper 作为末位兜底（多语言，~1.5GB）
 
 你已经有硅基流动 API Key 了吗？还是需要我引导注册？
 ```
@@ -62,7 +62,8 @@ preference), ALWAYS present this guide before doing anything else:**
 
 - 选项 A：我已有 Key → 直接提供给我
 - 选项 B：帮我注册 → 打开 https://cloud.siliconflow.cn/i/pWcvZzOr 注册后在"API 密钥"页面创建一个 Key 给我
-- 选项 C：用本地 Whisper → 大模型下载 + CPU 推理（较慢但完全离线）
+- 选项 C：用本地 FunASR（推荐离线）→ Paraformer 中文模型，GPU 上 6 分钟音频约 20s，自带标点
+- 选项 D：用本地 Whisper → 多语言兜底，CPU 推理较慢，~1.5GB 模型
 ```
 
 **Step 3: Store the key.** When the user provides a key, store it:
@@ -109,15 +110,15 @@ DEEP ANALYSIS (user asked for "深度分析"/"完整分析"/"HTML"):
 |-------|-------------|-------------|
 | 1. Download | Both | yt-dlp + cookies + metadata |
 | 2. Audio | Both | Extract MP3 + ffprobe validate (±5%) |
-| 3. Transcribe | Both | TeleSpeechASR → SenseVoiceSmall → local Whisper |
+| 3. Transcribe | Both | Doubao bigmodel → TeleSpeechASR → SenseVoiceSmall → local FunASR → local Whisper（可手动指定 engine） |
 | 4. Structure | Both | Chapter breakdown, extract key points |
 | 5. SVG | Deep only | Content-driven diagrams per chapter |
 | 6. Keyframes | Deep only | UI/demo videos only; skip for talking-head |
 | 7. HTML | Deep only | Single-page with export toolbar |
 | 8. Verify | Deep only | Chrome headless screenshot + visual check |
 
-**Failsafe**: If Phase 3 (transcription) fails at all 3 tiers with no API key
-and no local Whisper, fall back to embedded subtitles from `--write-subs`
+**Failsafe**: If Phase 3 (transcription) fails at all 5 tiers (cloud Doubao + TeleSpeechASR +
+SenseVoiceSmall + local FunASR + local Whisper), fall back to embedded subtitles from `--write-subs`
 (Phase 1). Extract SRT directly from the video file:
 ```bash
 ffmpeg -i video.mp4 -map 0:s:0 output.srt
@@ -255,12 +256,15 @@ cloud API if a key is configured.
 
 ### Mode A: Cloud API (Recommended)
 
-Fast, no local compute, no model download. Two tiers:
+Fast, no local compute, no model download. Three providers (豆包首选，TeleSpeechASR 兜底)：
 
-| Priority | Provider | Register | Free Tier | Model | Notes |
-|----------|----------|----------|-----------|-------|-------|
-| **1st** | 硅基流动 | https://siliconflow.cn | 10h/month | TeleSpeechASR | Chinese-optimized, no emoji, best accuracy |
-| **2nd** | 硅基流动 | https://siliconflow.cn | 10h/month | SenseVoiceSmall | Has emoji noise, post-process required |
+| Priority | Provider | Register / 获取 Key | Model | Notes |
+|----------|----------|----------|-------|-------|
+| **1st** | 豆包(火山引擎) | https://console.volcengine.com/speech/new/setting/apikeys | bigmodel 2.0 | 中文最准(实测 78% vs TeleSpeechASR 22%)、自带标点+ITN+词级时间戳；异步 submit+query（**首选**） |
+| **2nd** | 硅基流动 | https://siliconflow.cn | TeleSpeechASR | 已验证稳定、sync API、no emoji（兜底） |
+| **3rd** | 硅基流动 | https://siliconflow.cn | SenseVoiceSmall | Has emoji noise, post-process required |
+
+#### 2nd: 硅基流动 TeleSpeechASR（云端兜底，已验证）
 
 Both use the same OpenAI-compatible API. Request format:
 
@@ -279,6 +283,45 @@ curl -s --max-time 60 --retry 3 --retry-delay 2 \
 - On HTTP 429 (rate limit): wait 30s then retry once
 - On HTTP 401/403 (auth failure): report to user, fall to next tier
 - On timeout: report and fall to next tier
+
+#### 1st: 豆包录音文件识别大模型 2.0（首选云端）
+
+**云端首选引擎**（实测中文准确率 78%，显著优于 TeleSpeechASR 22%）。官方文档：
+https://www.volcengine.com/docs/6561/1354868
+
+**获取 X-Api-Key**：新版控制台 → API 密钥管理
+https://console.volcengine.com/speech/new/setting/apikeys （创建/复制 X-Api-Key）。
+存入 `~/.video2doc/config.json` 的 `doubao_api_key`，或设 `DOUBAO_API_KEY` 环境变量。
+
+异步 API：`submit` 提交(X-Api-Sequence:-1) → 用同一 `X-Api-Request-Id` 轮询
+`query` 取结果。`X-Api-Resource-Id` 用 `volc.seedasr.auc`（2.0）；1.0 用 `volc.bigasr.auc`。
+
+**关键实现要点（对齐官方文档）**：
+- **状态码在响应头 `X-Api-Status-Code`，不在 body**：`20000000` 成功 /
+  `20000001` 处理中 / `20000002` 排队 / `20000003` 静音 / `4xxxxx`·`5xxxxx` 错误。
+  轮询时按此判定：处理中/排队继续等，错误立即退出。`X-Tt-Logid` 记录用于排错。
+- **音频字段**：官方文档**仅列 `audio.url`**（公网 URL）。`audio.data`(base64 内联)
+  **实测可用但非文档字段**，本地音频靠它免公网托管；超大文件(<512M 上限)建议走 URL。
+- 音频需 16kHz；`_transcribe_doubao` 用 ffmpeg 自动重采样到 16k 单声道 mp3。
+
+```bash
+# submit（body 大时用 -d @file 避免 ARG_MAX；pipeline 内部用 urllib 无此问题）
+curl -L -X POST 'https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit' \
+  -H 'Content-Type: application/json' \
+  -H "x-api-key: $DOUBAO_API_KEY" \
+  -H 'X-Api-Resource-Id: volc.seedasr.auc' \
+  -H "X-Api-Request-Id: $REQ_ID" -H 'X-Api-Sequence: -1' \
+  -d @body.json   # {"user":..,"audio":{"data":"<base64>","format":"mp3","rate":16000,...},"request":{"model_name":"bigmodel","enable_itn":true,"enable_punc":true,"show_utterances":true,...}}
+
+# query（同一 REQ_ID 轮询，看响应头 X-Api-Status-Code=20000000 即成功）
+curl -L -X POST 'https://openspeech.bytedance.com/api/v3/auc/bigmodel/query' \
+  -H 'Content-Type: application/json' -H "x-api-key: $DOUBAO_API_KEY" \
+  -H 'X-Api-Resource-Id: volc.seedasr.auc' -H "X-Api-Request-Id: $REQ_ID" -d '{}'
+```
+
+`webui/pipeline.py` 的 `_transcribe_doubao()` 已封装（用 urllib 而非 curl）：
+重采样→base64→submit→按响应头状态码轮询(最多 ~90s)→归一化 `{text, segments}`(ms→s)。
+实测 6:43 音频 ~35s 完成，中文同音字识别优于 TeleSpeechASR。
 
 The `verbose_json` response includes segment-level timestamps (`segments[].start`,
 `segments[].end`, `segments[].text`). Convert this to SRT format for downstream
@@ -321,16 +364,94 @@ Scripts source `scripts/load_config.sh` to load the key from any of these source
 If not found, go back to First-Run Guide → Transcription Setup Flow.
 
 **Provider selection logic (ordered by priority)**:
-1. **TeleSpeechASR** — use for all Chinese content. Best accuracy, no emoji noise.
-2. **SenseVoiceSmall** — fallback if TeleSpeechASR fails or for A/B comparison.
-   Always post-process with `emoji.replace_emoji()` to strip emoji.
-3. **Local Whisper** — last resort when no API key is configured, or user
-   explicitly prefers offline transcription (privacy, no network).
+1. **Doubao bigmodel 2.0** (cloud) — preferred cloud engine. Best Chinese accuracy
+   (实测 78% vs TeleSpeechASR 22%), built-in punctuation + ITN + word timestamps.
+   Async submit+query, base64 inline audio. Needs `DOUBAO_API_KEY`.
+2. **TeleSpeechASR** (cloud) — fallback. Proven stable, sync API, no emoji noise.
+   Needs `SILICONFLOW_API_KEY`.
+3. **SenseVoiceSmall** (cloud) — alternative for A/B comparison. Always post-process
+   with `emoji.replace_emoji()` to strip emoji.
+4. **Local FunASR / Paraformer** — preferred offline engine. Faster + more accurate
+   for Chinese than Whisper, with built-in VAD + punctuation + ITN. Use when no
+   API key, no network, or quota exhausted. Implemented in `webui/pipeline.py`
+   (`_transcribe_funasr`), auto-selects `cuda`/`cpu`.
+5. **Local Whisper** — last resort. Only when FunASR is unavailable or content is
+   non-Chinese (Whisper has broader language coverage). Implemented in
+   `_transcribe_whisper`.
 
-### Mode B: Local Whisper (Fallback)
+#### 引擎选择机制（默认自动 + 手动可选）
 
-Only use this if no cloud API key is available, or the user explicitly prefers
-local transcription (privacy, no network, etc.).
+webui `transcribe(audio_path, job)` 按 `job.engine` 决定引擎（默认 `auto`）：
+
+- **`auto`（默认）**：按上述 1→2→4→5 顺序自动降级。**首选额度耗尽/不稳定时静默
+  切到下一级**，并在 `job.engine_note` 提示用户（如「已自动切换到 tele（doubao 不可用）」），
+  前端结果区显示所用引擎徽章。无 Key 的云端引擎会被即时跳过。
+- **手动指定**：`engine` 取 `doubao` / `tele` / `funasr` / `whisper` 时，仅用该引擎；
+  失败时 `job.error` 提示「可切换其他引擎重试」。
+
+**前端（index.html）**：在线转录 / 本地转录弹窗各有一个「引擎」下拉
+（默认自动降级 / 豆包2.0首选 / TeleSpeechASR / 本地FunASR / 本地Whisper），
+用户可手动指定；不选则走自动降级链路。
+
+**额度耗尽 / 不稳定时的处理**：
+- auto 模式：自动切下一级，结果区显示「🤖 tele · 已自动切换到 tele（doubao 不可用）」。
+- 手动模式：失败提示「可切换其他引擎重试：引擎下拉选择」，用户改下拉重试即可。
+- 豆包额度相关错误码（`45000131` 超提交上限 / `45000132` 超大小 / `55000031` 服务器繁忙 /
+  401·403 鉴权失败）由 `_transcribe_doubao` 捕获并写入 `job.error`，便于识别。
+
+### Mode B: Local FunASR (Preferred Offline)
+
+Use this when the cloud API is unavailable (no key, no network, quota exhausted)
+or the user explicitly prefers offline transcription. **FunASR (Paraformer) is
+the preferred local engine** — faster and more accurate for Chinese than Whisper,
+with built-in VAD + punctuation + ITN.
+
+#### Prerequisites
+
+```bash
+pip install funasr   # also pulls torch (CUDA optional)
+# First run downloads ~300MB of models to ~/.cache/modelscope/ (one-time)
+# GPU: install CUDA-enabled torch for ~10x speedup
+```
+
+#### Hardware & Speed (RTF = process_time / audio_time)
+
+| Hardware | RTF | 6-min audio |
+|----------|-----|-------------|
+| RTX 4060/5060 (8GB VRAM) | ~0.05 | ~20s |
+| CPU only | ~0.3-1.0 | 1-3 min |
+
+Paraformer is non-autoregressive — much faster than Whisper's autoregressive decoding.
+
+#### Command
+
+```python
+from funasr import AutoModel
+
+model = AutoModel(
+    model="paraformer-zh",      # Chinese ASR
+    vad_model="fsmn-vad",       # silence segmentation
+    punc_model="ct-punc",       # auto punctuation
+    device="cuda",              # or "cpu"
+)
+res = model.generate(input="audio.mp3", batch_size_s=300)
+# res: list of {text, timestamp} per VAD segment
+```
+
+The pipeline (`webui/pipeline.py`, `_transcribe_funasr`) normalizes FunASR output
+into the same `{text, segments}` shape as the cloud API, so downstream phases
+(SRT export, chaptering) work unchanged. Device auto-selects `cuda` if available,
+else `cpu`.
+
+#### When to use FunASR vs Whisper
+
+- **FunASR** — Chinese content, want speed + punctuation, GPU or decent CPU.
+- **Whisper** — multilingual (non-Chinese) content, or FunASR fails to install.
+
+### Mode C: Local Whisper (Last Resort)
+
+Only use this if no cloud API key is available AND FunASR is not installed/fails,
+or the user explicitly prefers Whisper (e.g. non-Chinese content).
 
 #### Model Selection
 
@@ -353,7 +474,7 @@ whisper "<AUDIO.mp3>" \
 Note: `ffmpeg` must be in `PATH` when running Whisper. If using a custom
 ffmpeg binary, export its directory before running.
 
-### Post-Transcription Validation (Both Modes)
+### Post-Transcription Validation (All Modes)
 
 Parse the SRT or JSON output and check:
 1. Extract the `end` timestamp of the last segment.
@@ -746,8 +867,10 @@ Correction rules for Chinese transcription:
 - Requires cookies for 1080p+ quality. Use `--cookies-from-browser chrome`.
 - Multi-part videos (分P): `yt-dlp` downloads all parts by default. Use
   `--playlist-items 1` to download a specific part.
-- Subtitles (弹幕): use `--write-subs --sub-langs all` to capture CC
-  subtitles; Danmaku (弹幕) is not supported by yt-dlp directly.
+- Subtitles (弹幕 / AI字幕): Phase 1 的 `--write-subs --sub-langs all` 会**自动下载
+  B站平台生成的 AI 字幕**（`ai-zh`/`ai-en`/`ai-ja` 等多语种 .srt），同时抓弹幕 xml。
+  这些 AI 字幕可作为转录参考或兜底（Failsafe：ASR 全失败时直接用 `ai-zh.srt`）。
+  注意：**不是所有 B站视频都有 AI 字幕**（仅平台已生成的才有）；弹幕本身 yt-dlp 不直接支持。
 
 ### Douyin (抖音) — CRITICAL: Anti-Bot Strategy
 
@@ -898,8 +1021,10 @@ Only try if both Tier 1 and Tier 2 fail. Known failure: "Fresh cookies needed",
 | `yt-dlp` | Video download | Always |
 | `ffmpeg` + `ffprobe` | Audio/video processing | Always |
 | `emoji` (Python) | SenseVoiceSmall text cleanup | If using SenseVoiceSmall |
-| 硅基流动 API Key | Cloud transcription (recommended) | Cloud mode |
-| `openai-whisper` | Local transcription fallback | Only if no API key |
+| 豆包(火山) API Key | Cloud transcription (preferred, bigmodel 2.0) | Cloud mode |
+| 硅基流动 API Key | Cloud transcription (fallback) | Cloud mode |
+| `funasr` | Local transcription (preferred offline, Chinese) | Offline mode |
+| `openai-whisper` | Local transcription (last resort, multilingual) | Offline fallback |
 | Playwright CLI | Douyin/XHS video URL extraction | Douyin/XHS scenarios |
 | Chrome/Chromium | Headless verification | Optional (deep analysis mode) |
 

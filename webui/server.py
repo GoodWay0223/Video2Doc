@@ -103,7 +103,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             job = job_manager.Job(url=url, job_type=job_manager.JobType.TRANSCRIBE_ONLINE,
                                   mode=data.get('mode','transcript'),
                                   formats=data.get('formats','md').split(','),
-                                  domain=data.get('domain'))
+                                  domain=data.get('domain'),
+                                  engine=data.get('engine','auto'))
             job_manager.add_job(job)
             threading.Thread(target=pipeline.run_transcribe_pipeline, args=(job,), daemon=True).start()
             self._send_json({"job_id":job.id,"status":"queued"})
@@ -115,7 +116,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             url = data.get('url','').strip()
             if not url: self._send_json({"error":"未提供链接"},400); return
 
-            job = job_manager.Job(url=url, job_type=job_manager.JobType.DOWNLOAD)
+            job = job_manager.Job(url=url, job_type=job_manager.JobType.DOWNLOAD,
+                                  engine=data.get('engine','auto'))
             job_manager.add_job(job)
 
             also_transcribe = data.get('transcribe', False)
@@ -151,6 +153,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             file_data = None
             filename = None
             formats_val = 'md'
+            engine_val = 'auto'
 
             for part in parts:
                 if b'\r\n\r\n' not in part and b'\n\n' not in part:
@@ -167,6 +170,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     file_data = content
                 elif b'name="formats"' in header_section:
                     formats_val = content.decode('utf-8', errors='ignore').strip()
+                elif b'name="engine"' in header_section:
+                    engine_val = content.decode('utf-8', errors='ignore').strip()
 
             if not file_data or not filename:
                 self._send_json({"error": "未收到文件"}, 400); return
@@ -175,7 +180,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"error": "文件超过 200MB 限制"}, 413); return
 
             job = job_manager.Job(job_type=job_manager.JobType.TRANSCRIBE_LOCAL,
-                                  formats=formats_val.split(','))
+                                  formats=formats_val.split(','),
+                                  engine=engine_val)
             job.local_filename = filename
             job.local_filesize = len(file_data)
             job_manager.add_job(job)

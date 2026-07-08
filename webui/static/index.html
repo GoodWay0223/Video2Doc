@@ -277,7 +277,7 @@ body {
   <div class="history-section" id="history-section"></div>
 
   <!-- Footer -->
-  <div class="footer">Video2Doc v0.4.2 · MIT License · 永久免费</div>
+  <div class="footer">Video2Doc v0.4.3 · MIT License · 永久免费</div>
 
 </div>
 
@@ -310,6 +310,7 @@ body {
   <div class="modal-body">
     <div class="input-row"><input class="form-control" id="tr-url" placeholder="粘贴抖音 / B站 / YouTube 链接…" autofocus><button class="btn-action btn-tr" id="tr-btn" onclick="startTranscribe()">转录</button></div>
     <div class="opts-row">
+      <select id="tr-engine" title="识别引擎"><option value="auto">默认（自动降级）</option><option value="doubao">豆包 2.0（首选）</option><option value="tele">TeleSpeechASR</option><option value="funasr">本地 FunASR</option><option value="whisper">本地 Whisper</option></select>
       <select id="tr-format"><option value="md">MD 文稿</option><option value="srt">SRT 字幕</option><option value="txt">TXT 文本</option><option value="json">JSON</option><option value="all">全部格式</option></select>
       <select id="tr-domain"><option value="">自动检测领域</option><option value="auto">汽车 🚗</option><option value="tech">科技 💻</option></select>
     </div>
@@ -346,6 +347,7 @@ body {
     </div>
     <input type="file" id="lo-file" accept="audio/*,video/*" style="display:none" onchange="handleFileSelect(this)">
     <div class="opts-row">
+      <select id="lo-engine" title="识别引擎"><option value="auto">默认（自动降级）</option><option value="doubao">豆包 2.0（首选）</option><option value="tele">TeleSpeechASR</option><option value="funasr">本地 FunASR</option><option value="whisper">本地 Whisper</option></select>
       <select id="lo-format"><option value="md">MD 文稿</option><option value="srt">SRT 字幕</option><option value="txt">TXT 文本</option><option value="json">JSON</option><option value="all">全部格式</option></select>
       <button class="btn-action btn-lo btn-sm" id="lo-btn" onclick="startLocalTranscribe()" style="display:none">开始转录</button>
     </div>
@@ -389,14 +391,14 @@ function resetModal(p){document.querySelectorAll(`#${p}-steps .progress-step`).f
 async function startDownload(){const u=document.getElementById('dl-url').value.trim();if(!u)return alert('请粘贴视频链接');document.getElementById('dl-btn').disabled=true;document.getElementById('dl-progress').classList.add('show');updateSteps('dl',0);const t=document.getElementById('dl-transcribe').checked;activeJob('dl','download-video',{url:u,transcribe:t},r=>{document.getElementById('dl-progress').classList.remove('show');document.getElementById('dl-result').classList.add('show');const f=r.files||[];document.getElementById('dl-result-text').textContent=f.length?`✅ 已保存: ${f[0].name} (${formatSize(f[0].size)})`:'✅ 下载完成';document.getElementById('dl-result-actions').innerHTML=f.map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-dl btn-sm">📥 ${x.name}</a>`).join('');loadHistory()})}
 
 // Transcribe
-async function startTranscribe(){const u=document.getElementById('tr-url').value.trim();if(!u)return alert('请粘贴视频链接');document.getElementById('tr-btn').disabled=true;document.getElementById('tr-progress').classList.add('show');updateSteps('tr',0);const f=document.getElementById('tr-format').value,d=document.getElementById('tr-domain').value;activeJob('tr','transcribe-online',{url:u,formats:f,domain:d},async r=>{document.getElementById('tr-progress').classList.remove('show');document.getElementById('tr-result').classList.add('show');try{const[t,s]=await Promise.all([fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),fetch('/api/content/'+r.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')]);document.getElementById('tr-txt').textContent=t;document.getElementById('tr-srt').textContent=s;document.getElementById('tr-result-actions').innerHTML=(r.files||[]).map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-tr btn-sm">📥 ${x.name}</a>`).join('')+`<button class="btn-action btn-sm btn-tr" onclick="copyText('${escapeHtml(t)}')">📋 复制</button>`}catch(e){}loadHistory()})}
+async function startTranscribe(){const u=document.getElementById('tr-url').value.trim();if(!u)return alert('请粘贴视频链接');document.getElementById('tr-btn').disabled=true;document.getElementById('tr-progress').classList.add('show');updateSteps('tr',0);const f=document.getElementById('tr-format').value,d=document.getElementById('tr-domain').value,e=document.getElementById('tr-engine').value;activeJob('tr','transcribe-online',{url:u,formats:f,domain:d,engine:e},async r=>{document.getElementById('tr-progress').classList.remove('show');document.getElementById('tr-result').classList.add('show');try{const[t,s]=await Promise.all([fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),fetch('/api/content/'+r.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')]);document.getElementById('tr-txt').textContent=t;document.getElementById('tr-srt').textContent=s;document.getElementById('tr-result-actions').innerHTML=engineBadge(r)+(r.files||[]).map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-tr btn-sm">📥 ${x.name}</a>`).join('')+`<button class="btn-action btn-sm btn-tr" onclick="copyText('${escapeHtml(t)}')">📋 复制</button>`}catch(e){}loadHistory()})}
 
 // Local
 function handleDrop(e){const f=e.dataTransfer.files[0];if(f)selectFile(f)}
 function handleFileSelect(i){const f=i.files[0];if(f)selectFile(f)}
 function selectFile(f){if(f.size>200*1024*1024)return alert('文件超过 200MB 限制');localFile=f;const z=document.getElementById('upload-zone');z.classList.add('file-selected');z.innerHTML=`<div class="file-info"><span class="name">📄 ${f.name}</span><span class="size">${formatSize(f.size)}</span><button class="btn-action btn-sm btn-local" onclick="clearFile()">移除</button></div>`;document.getElementById('lo-btn').style.display='inline-block'}
 function clearFile(){localFile=null;document.getElementById('lo-btn').style.display='none';const z=document.getElementById('upload-zone');z.classList.remove('file-selected');z.innerHTML='<div class="icon">📁</div><p>拖拽文件到此处或点击选择</p><small>MP3 · WAV · MP4 · MOV · MKV · WebM · M4A</small><small>最大 200MB</small>'}
-async function startLocalTranscribe(){if(!localFile)return alert('请先选择文件');document.getElementById('lo-btn').disabled=true;document.getElementById('lo-progress').classList.add('show');updateSteps('lo',1);const fd=new FormData();fd.append('file',localFile);fd.append('formats',document.getElementById('lo-format').value);try{const r=await fetch('/api/transcribe-local',{method:'POST',body:fd});const d=await r.json();if(d.error){showError('lo',d.error);return}activeJob('lo',null,null,async r=>{document.getElementById('lo-progress').classList.remove('show');document.getElementById('lo-result').classList.add('show');try{const[t,s]=await Promise.all([fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),fetch('/api/content/'+r.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')]);document.getElementById('lo-txt').textContent=t;document.getElementById('lo-srt').textContent=s;document.getElementById('lo-result-actions').innerHTML=(r.files||[]).map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-lo btn-sm">📥 ${x.name}</a>`).join('')+`<button class="btn-action btn-sm btn-lo" onclick="copyText('${escapeHtml(t)}')">📋 复制</button>`}catch(e){}loadHistory()},d.job_id)}catch(e){showError('lo','连接失败')}}
+async function startLocalTranscribe(){if(!localFile)return alert('请先选择文件');document.getElementById('lo-btn').disabled=true;document.getElementById('lo-progress').classList.add('show');updateSteps('lo',1);const fd=new FormData();fd.append('file',localFile);fd.append('formats',document.getElementById('lo-format').value);fd.append('engine',document.getElementById('lo-engine').value);try{const r=await fetch('/api/transcribe-local',{method:'POST',body:fd});const d=await r.json();if(d.error){showError('lo',d.error);return}activeJob('lo',null,null,async r=>{document.getElementById('lo-progress').classList.remove('show');document.getElementById('lo-result').classList.add('show');try{const[t,s]=await Promise.all([fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),fetch('/api/content/'+r.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')]);document.getElementById('lo-txt').textContent=t;document.getElementById('lo-srt').textContent=s;document.getElementById('lo-result-actions').innerHTML=engineBadge(r)+(r.files||[]).map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-lo btn-sm">📥 ${x.name}</a>`).join('')+`<button class="btn-action btn-sm btn-lo" onclick="copyText('${escapeHtml(t)}')">📋 复制</button>`}catch(e){}loadHistory()},d.job_id)}catch(e){showError('lo','连接失败')}}
 
 // Shared polling
 async function activeJob(p,ep,body,onDone,oid){
@@ -426,6 +428,7 @@ function switchTab(btn,cid){btn.parentElement.querySelectorAll('.result-tab').fo
 
 // Utils
 function formatSize(b){return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'}
+function engineBadge(r){if(!r.engine_used)return'';const labels={doubao:'豆包2.0',tele:'TeleSpeechASR',funasr:'本地FunASR',whisper:'本地Whisper'};const name=labels[r.engine_used]||r.engine_used;const note=r.engine_note?(' · '+r.engine_note):'';return`<span style="display:inline-block;padding:4px 10px;background:#e0e7ff;color:#3730a3;border-radius:6px;font-size:12px;margin-right:8px;vertical-align:middle;">🤖 ${name}${note}</span>`}
 function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 async function copyText(t){try{await navigator.clipboard.writeText(t);alert('已复制')}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('已复制')}}
 

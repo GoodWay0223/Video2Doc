@@ -15,13 +15,16 @@ class JobType:
 
 class Job:
     def __init__(self, job_id=None, url="", job_type=JobType.TRANSCRIBE_ONLINE,
-                 mode="transcript", formats=None, domain=None):
+                 mode="transcript", formats=None, domain=None, engine="auto"):
         self.id = job_id or str(uuid.uuid4())[:8]
         self.url = url
         self.type = job_type
         self.mode = mode
         self.formats = formats or ["md"]
         self.domain = domain
+        self.engine = engine or "auto"  # auto|doubao|tele|funasr|whisper
+        self.engine_used = ""            # 实际成功的引擎
+        self.engine_note = ""            # 引擎切换提示（如"已自动切换到 tele"）
         self.status = "queued"
         self.progress = 0
         self.title = ""
@@ -42,6 +45,7 @@ class Job:
         return {
             "id": self.id, "url": self.url, "type": self.type,
             "mode": self.mode, "formats": self.formats, "domain": self.domain,
+            "engine": self.engine, "engine_used": self.engine_used, "engine_note": self.engine_note,
             "status": self.status, "progress": self.progress,
             "title": self.title, "duration": self.duration,
             "files": self.files, "error": self.error,
