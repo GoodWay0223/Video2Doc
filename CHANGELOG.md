@@ -1,5 +1,35 @@
 # Changelog
 
+## [v0.5.0] — 2026-07-09（大版本：下载链路全面优化 + 字幕优先 + 文稿增强）
+
+### Added
+- **抖音免 cookie 下载**：接入 iesdouyin 分享接口（移动端 UA + 提取 `window._ROUTER_DATA` +
+  `playwm→play` 去水印），**无需 cookie/登录/yt-dlp**，实测两个抖音视频一次成功带音轨。参考 chubbyguan/chubbyskills。
+- **小红书免 cookie 下载**：接入 `__INITIAL_STATE__` 解析（括号配平提 JSON + 递归找 note +
+  `video.media.stream.masterUrl` 直链），移动端 UA，XHS_COOKIE 可选。yt-dlp 降为兜底。
+- **字幕优先（B站/YouTube）**：`run_transcribe_pipeline` 在 engine=auto 时优先用平台 `ai-zh.srt`
+  直接当文稿、**跳过 ASR**（秒级、免额度）；新增 `_parse_srt_to_transcript` + `_try_subtitle_transcript`。
+  手动指定 engine 则强制 ASR。
+- **content-enrich 文稿增强**：转录后自动用 SiliconFlow chat（DeepSeek-V3）补**一句话摘要 + 3-5 要点 +
+  3-5 标签**，写入 `transcript.md` 顶部 `## 📝 摘要` 块（原文完整保留），JSON 带 enrichment 字段。best-effort。
+
+### Fixed
+- **B站 webui 下载 bug**：yt-dlp 未合并视频轨（留 `video.fXXXX.mp4` 不匹配）→ 加 `--ffmpeg-location` 自动合并 + 兜底合并逻辑。
+- **纯下载路径双重坏**：`download_video_only` 没用新优化方法 + 存到错误目录导致下载链接 404 → 复用 `download_video` 全优化 + 移到 job.dir 根目录供服务。
+- **本地转录失败无错误处理**：`run_local_pipeline` 失败时未设 error 状态导致前端无限轮询 → 补 status=error + 消息。
+- **本地转录同文件复制报错**：上传音频若名 audio.mp3 → `shutil.copy2` 同文件崩 → 同路径跳过复制。
+
+### Changed
+- 抖音下载链路：iesdouyin（首选，无 cookie）→ yt-dlp+cookie（兜底）→ Playwright（末位）。
+- download_video 的 yt-dlp 加 `--write-subs --sub-langs all` 抓平台字幕（供字幕优先）。
+- 三大核心平台（抖音/B站/小红书）下载成功率全面提升。
+
+### Verified
+- 抖音 iesdouyin：2 视频（10:41/2:13）一次成功带音轨 → 豆包转录 55.6s/11.7s
+- B站字幕优先：11.2s 出稿（下载+字幕，零 ASR 额度）
+- content-enrich：CDC/MRC 摘要+5要点+5标签准确
+- 通篇 QA：纯下载/本地转录/在线转录/内容API 端到端实测通过；前端 JS + 全部 py 语法 OK
+
 ## [v0.4.3] — 2026-07-08
 
 ### Added

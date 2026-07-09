@@ -56,40 +56,238 @@ def resolve_url(url):
 def download_video(job):
     """Download video for online transcription.
 
-    优先用 yt-dlp（支持抖音/B站/YouTube 等绝大多数平台）；
-    抖音因反爬常导致 yt-dlp 拿不到视频时，再回退到 Playwright 浏览器兜底。
+    抖音：优先用 iesdouyin 分享接口（无需 cookie/登录，最稳），失败再退 yt-dlp/Playwright。
+    其他平台（B站/YouTube 等）：直接走 yt-dlp。
     """
     full_url = resolve_url(job.url)
     job.url = full_url
     raw_dir = job.dir / "raw"
     raw_dir.mkdir(exist_ok=True)
 
-    is_douyin = "douyin.com" in full_url
+    is_douyin = "douyin.com" in full_url or "iesdouyin" in full_url
+    is_xhs = "xiaohongshu.com" in full_url or "xhslink.com" in full_url
 
-    # 1) 优先尝试 yt-dlp（抖音本身也在其支持列表里）
+    # 1) 抖音：优先 iesdouyin 分享接口（无 cookie，实测最稳）
+    if is_douyin:
+        f = _download_douyin_iesdouyin(full_url, raw_dir, job)
+        if f and Path(f).exists(): return str(f)
+
+    # 1b) 小红书：优先 __INITIAL_STATE__ 解析（移动端 UA，cookie 可选）
+    if is_xhs:
+        f = _download_xhs_initial_state(full_url, raw_dir, job)
+        if f and Path(f).exists(): return str(f)
+
+    # 2) yt-dlp（通用，抖音 iesdouyin 失败时也再试一次带 cookie 的 yt-dlp）
     yt = find_executable(["yt-dlp", "yt-dlp.exe",
                           str(Path.home() / ".workbuddy/binaries/python/envs/default/bin/yt-dlp")])
     if yt:
-        subprocess.run([yt, "-o", str(raw_dir / "video.%(ext)s"), full_url],
-                      capture_output=True, timeout=300)
+        sub_opts = ["--write-subs", "--sub-langs", "all", "--write-auto-subs",
+                    "--sub-format", "srt/vtt/best"]
+        # 指定 ffmpeg 位置，让 yt-dlp 自动合并视频轨+音频轨成 video.mp4（否则留 video.fXXXX.mp4 不匹配）
+        ff_bin = find_executable(["ffmpeg", "ffmpeg.exe",
+                                  str(Path.home() / ".workbuddy/binaries/ffmpeg/ffmpeg")])
+        ff_loc = ["--ffmpeg-location", str(Path(ff_bin).parent)] if ff_bin else []
+        try:
+            subprocess.run([yt, "--cookies-from-browser", "chrome"] + sub_opts + ff_loc +
+                           ["-o", str(raw_dir / "video.%(ext)s"), full_url],
+                          capture_output=True, timeout=300)
+        except Exception:
+            subprocess.run([yt] + sub_opts + ff_loc +
+                           ["-o", str(raw_dir / "video.%(ext)s"), full_url],
+                          capture_output=True, timeout=300)
         for ext in ["mp4", "webm", "mkv", "flv"]:
             f = raw_dir / f"video.{ext}"
             if f.exists(): return str(f)
+        # 兜底：若仍未合并，找 video.f*.mp4 单视频轨并尝试合并
+        v_tracks = sorted(raw_dir.glob("video.f*.mp4"))
+        a_tracks = sorted(raw_dir.glob("video.f*.m4a")) + sorted(raw_dir.glob("video.f*.mp3"))
+        if v_tracks and ff_bin:
+            merged = raw_dir / "video.mp4"
+            cmd = [ff_bin, "-y", "-i", str(v_tracks[0])]
+            if a_tracks:
+                cmd += ["-i", str(a_tracks[0]), "-c", "copy", "-map", "0:v", "-map", "1:a"]
+            else:
+                cmd += ["-c", "copy"]
+            cmd += [str(merged)]
+            subprocess.run(cmd, capture_output=True, timeout=120)
+            if merged.exists() and merged.stat().st_size > 100000:
+                return str(merged)
 
-    # 2) yt-dlp 没拿到视频：抖音走 Playwright 浏览器兜底
+    # 3) 抖音 Playwright 浏览器兜底（最后手段）
     if is_douyin:
         f = _download_douyin_playwright(full_url, raw_dir, job)
         if f and Path(f).exists(): return str(f)
 
-    # 3) 都失败，给出可执行的提示
-    if not yt:
+    # 4) 都失败，给出可执行的提示
+    if is_douyin:
+        job.error = ("抖音下载失败：iesdouyin/yt-dlp/Playwright 均未拿到视频。"
+                     "可手动保存视频后走「本地媒体转录」。")
+    elif is_xhs:
+        job.error = ("小红书下载失败：__INITIAL_STATE__/yt-dlp 均未拿到视频。"
+                     "可设 XHS_COOKIE 环境变量，或手动保存视频后走「本地媒体转录」。")
+    elif not yt:
         job.error = "未找到 yt-dlp，请执行 pip install yt-dlp"
-    elif is_douyin:
-        job.error = ("抖音下载失败：yt-dlp 未能获取视频。可安装 Playwright 浏览器兜底："
-                     "pip install playwright && playwright install chromium")
     else:
         job.error = "视频下载失败：yt-dlp 未能获取该链接的视频"
     return None
+
+
+def _download_douyin_iesdouyin(url, raw_dir, job):
+    """抖音下载：iesdouyin 分享接口（无需 cookie/登录/yt-dlp）。
+
+    用 iesdouyin.com/share/video/<id> + 移动端 UA 提取 window._ROUTER_DATA，
+    拿 CDN 直链（playwm→play 去水印）下载。参考 chubbyguan/chubbyskills。
+    返回视频路径或 None。
+    """
+    MOBILE_UA = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) "
+                 "AppleWebKit/605.1.15 (KHTML, like Gecko) EdgiOS/121.0.2277.107 "
+                 "Version/17.0 Mobile/15E148 Safari/604.1")
+    curl = find_executable(["curl", "curl.exe"]) or "curl"
+    try:
+        # 1) 提取 video id（已是完整链接直接取；短链则跟重定向）
+        m = re.search(r'/video/(\d+)', url)
+        if not m:
+            r = subprocess.run([curl, "-sI", "-L", "-H", f"User-Agent: {MOBILE_UA}", url],
+                               capture_output=True, text=True, timeout=15)
+            for line in r.stdout.split('\n'):
+                if 'location:' in line.lower():
+                    url = line.split(':', 1)[1].strip()
+            m = re.search(r'/video/(\d+)', url)
+        if not m:
+            job.error = "iesdouyin: 无法提取视频ID"
+            return None
+        vid = m.group(1)
+        # 2) 抓 iesdouyin 分享页
+        share = f"https://www.iesdouyin.com/share/video/{vid}"
+        r = subprocess.run([curl, "-s", "-L", "-H", f"User-Agent: {MOBILE_UA}", share],
+                           capture_output=True, text=True, timeout=30)
+        html = r.stdout
+        # 3) 提取 window._ROUTER_DATA
+        match = re.search(r'window\._ROUTER_DATA\s*=\s*(.*?)</script>', html, re.DOTALL)
+        if not match:
+            job.error = "iesdouyin: _ROUTER_DATA 未找到（接口可能已变）"
+            return None
+        data = json.loads(match.group(1).strip())
+        item = data["loaderData"]["video_(id)/page"]["videoInfoRes"]["item_list"][0]
+        if not job.title:
+            job.title = item.get("desc", "")  # 顺便拿视频标题
+        vurl = item["video"]["play_addr"]["url_list"][0].replace("playwm", "play")
+        # 4) 下载视频（移动端 UA + Referer）
+        out = raw_dir / "video.mp4"
+        subprocess.run([curl, "-s", "-L", "-o", str(out),
+                        "-H", f"User-Agent: {MOBILE_UA}",
+                        "-H", "Referer: https://www.douyin.com/", vurl],
+                       timeout=300, check=True)
+        if out.exists() and out.stat().st_size > 100000:
+            return str(out)
+        job.error = "iesdouyin: 下载文件过小或为空"
+        return None
+    except Exception as e:
+        job.error = f"iesdouyin 下载失败: {e}"
+        return None
+
+
+def _download_xhs_initial_state(url, raw_dir, job):
+    """小红书下载：解析页面 __INITIAL_STATE__ 提视频直链（移动端 UA，cookie 可选）。
+
+    比纯 yt-dlp+cookie 稳：移动端 UA 更宽容，结构化数据优先，masterUrl 直链下载。
+    参考 chubbyguan/chubbyskills。可选 XHS_COOKIE 环境变量提高成功率。
+    返回视频路径或 None。
+    """
+    UA = ("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
+          "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1")
+    curl = find_executable(["curl", "curl.exe"]) or "curl"
+    cookie = os.environ.get("XHS_COOKIE", "")
+    try:
+        # 1) 抓页面（移动端 UA + Referer，可选 cookie）
+        hdr = ["-H", f"User-Agent: {UA}", "-H", "Referer: https://www.xiaohongshu.com/"]
+        if cookie:
+            hdr += ["-H", f"Cookie: {cookie}"]
+        r = subprocess.run([curl, "-s", "-L"] + hdr + [url],
+                           capture_output=True, text=True, timeout=30)
+        html = r.stdout
+        # 风控检测
+        if "请通过小红书" in html or "verify" in html.lower()[:2000]:
+            job.error = "小红书风控拦截（建议设 XHS_COOKIE 环境变量）"
+            return None
+        # 2) 括号配平提取 __INITIAL_STATE__（比 }</script> 正则稳）
+        idx = html.find("__INITIAL_STATE__")
+        if idx == -1:
+            job.error = "小红书: __INITIAL_STATE__ 未找到"
+            return None
+        brace = html.find("{", idx)
+        if brace == -1:
+            return None
+        depth, in_str, esc, end = 0, False, False, -1
+        for i, ch in enumerate(html[brace:]):
+            if esc: esc = False; continue
+            if ch == "\\": esc = True; continue
+            if ch == '"': in_str = not in_str; continue
+            if in_str: continue
+            if ch == "{": depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0: end = brace + i + 1; break
+        if end < 0:
+            return None
+        raw = re.sub(r"([:,\[]\s*)undefined\b", r"\1null", html[brace:end])
+        state = json.loads(raw)
+        # 3) 递归找 note（含 interactInfo + desc/title）
+        note = [None]
+        def walk(o):
+            if note[0] is not None: return
+            if isinstance(o, dict):
+                if "interactInfo" in o and ("desc" in o or "title" in o):
+                    note[0] = o; return
+                for v in o.values(): walk(v)
+            elif isinstance(o, list):
+                for v in o: walk(v)
+        # 优先走已知路径
+        try:
+            nm = state["note"]["noteDetailMap"]
+            for v in nm.values():
+                if isinstance(v, dict) and v.get("note"): note[0] = v["note"]; break
+        except Exception:
+            pass
+        if note[0] is None:
+            walk(state)
+        if note[0] is None:
+            job.error = "小红书: 未定位到 note 对象"
+            return None
+        if not job.title:
+            job.title = (note[0].get("title") or "").strip()
+        # 4) 提视频直链 masterUrl（h264/h265/h266/av1）
+        video = note[0].get("video") or {}
+        stream = (video.get("media") or {}).get("stream") or {}
+        vurl = None
+        for codec in ("h264", "h265", "h266", "av1"):
+            for item in (stream.get(codec) or []):
+                if item.get("masterUrl"): vurl = item["masterUrl"]; break
+            if vurl: break
+        if not vurl:
+            found = [None]
+            def w2(o):
+                if found[0] is not None: return
+                if isinstance(o, dict):
+                    if isinstance(o.get("masterUrl"), str): found[0] = o["masterUrl"]; return
+                    for v in o.values(): w2(v)
+                elif isinstance(o, list):
+                    for v in o: w2(v)
+            w2(video); vurl = found[0]
+        if not vurl:
+            job.error = "小红书: 未提取到视频直链（可能是图文笔记，非视频）"
+            return None
+        # 5) 下载视频
+        out = raw_dir / "video.mp4"
+        subprocess.run([curl, "-s", "-L", "-o", str(out)] + hdr + [vurl],
+                       timeout=300, check=True)
+        if out.exists() and out.stat().st_size > 100000:
+            return str(out)
+        job.error = "小红书: 下载文件过小或为空"
+        return None
+    except Exception as e:
+        job.error = f"小红书下载失败: {e}"
+        return None
 
 
 def _download_douyin_playwright(url, raw_dir, job):
@@ -188,26 +386,20 @@ def _download_douyin_playwright(url, raw_dir, job):
         return None
 
 def download_video_only(job):
-    """Pure download — save to output/downloads/"""
-    full_url = resolve_url(job.url)
-    job.url = full_url
-    dl_dir = OUTPUT_DIR / "downloads" / job.id
-    dl_dir.mkdir(parents=True, exist_ok=True)
-
-    yt = find_executable(["yt-dlp", "yt-dlp.exe",
-                          str(Path.home() / ".workbuddy/binaries/python/envs/default/bin/yt-dlp")])
-    if not yt:
-        job.error = "未找到 yt-dlp"
+    """Pure download — 复用 download_video 的优化逻辑(iesdouyin/小红书/ffmpeg-location)，
+    视频移到 job.dir/ 根目录，供 server /api/download/{id}/{file} 直供下载。"""
+    video = download_video(job)  # 下载到 job.dir/raw/video.mp4（含所有平台优化 + 字幕）
+    if not video:
+        if not job.error: job.error = "下载失败"
         return None
-    out_tpl = str(dl_dir / "video.%(ext)s")
-    subprocess.run([yt, "-o", out_tpl, full_url], capture_output=True, timeout=300)
-    for ext in ["mp4", "webm", "mkv", "flv"]:
-        f = dl_dir / f"video.{ext}"
-        if f.exists():
-            job.download_path = str(f)
-            job.files = [{"name": "Video", "file": f"video.{ext}", "size": f.stat().st_size}]
-            return str(f)
-    return None
+    # 移到 job.dir/ 根目录，供 server /api/download/{id}/{file} 服务
+    src = Path(video)
+    dst = job.dir / src.name
+    if src.resolve() != dst.resolve():
+        shutil.move(str(src), str(dst))
+    job.download_path = str(dst)
+    job.files = [{"name": "Video", "file": dst.name, "size": dst.stat().st_size}]
+    return str(dst)
 
 def extract_audio(video_path, output_path):
     ffmpeg = find_executable(["ffmpeg", "ffmpeg.exe",
@@ -530,10 +722,61 @@ def to_srt(segments):
         if text: lines.extend([str(i), f"{start} --> {end}", text, ""])
     return "\n".join(lines)
 
-def export_formats(job, transcript):
+def _enrich_transcript(text, job):
+    """content-enrich：用 LLM(SiliconFlow chat) 给文稿补 摘要+要点+标签。best-effort，失败返回 None。"""
+    key = _get_api_key()  # SiliconFlow key 同时支持 chat
+    if not key or not text or len(text) < 20:
+        return None
+    snippet = text[:4000]
+    prompt = ("请阅读下面视频文稿，输出 JSON：{\"summary\":\"一句话摘要\","
+              "\"keypoints\":[\"要点1\",\"要点2\",...],\"tags\":[\"标签1\",...]}。"
+              "要点3-5条，标签3-5个。只输出 JSON。\n\n文稿：\n" + snippet)
+    curl = find_executable(["curl", "curl.exe"]) or "curl"
+    body = json.dumps({
+        "model": "deepseek-ai/DeepSeek-V3",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3, "max_tokens": 700,
+    })
+    try:
+        r = subprocess.run([curl, "-s", "--max-time", "60", "--retry", "2",
+            "https://api.siliconflow.cn/v1/chat/completions",
+            "-H", f"Authorization: Bearer {key}",
+            "-H", "Content-Type: application/json",
+            "-d", body], capture_output=True, text=True, timeout=70)
+        data = json.loads(r.stdout)
+        content = data["choices"][0]["message"]["content"]
+        m = re.search(r'\{.*\}', content, re.DOTALL)
+        if m:
+            return json.loads(m.group(0))
+        return None
+    except Exception:
+        return None  # 增强失败不阻断主流程
+
+
+def _enrichment_block(enrichment):
+    """把 enrich 结果渲染成 Markdown 摘要块。"""
+    if not enrichment:
+        return ""
+    lines = ["## 📝 摘要", ""]
+    if enrichment.get("summary"):
+        lines += ["> " + enrichment["summary"], ""]
+    kp = enrichment.get("keypoints") or []
+    if kp:
+        lines += ["**要点：**", ""]
+        lines += [f"- {k}" for k in kp]
+        lines.append("")
+    tags = enrichment.get("tags") or []
+    if tags:
+        lines += ["**标签：** " + " ".join(f"`{t}`" for t in tags), ""]
+    lines += ["---", ""]
+    return "\n".join(lines)
+
+
+def export_formats(job, transcript, enrichment=None):
     exported = []
     segments = transcript.get("segments", [])
     full_text = transcript.get("text", "")
+    head = _enrichment_block(enrichment)
 
     for fmt in job.formats:
         fmt = fmt.strip()
@@ -544,7 +787,7 @@ def export_formats(job, transcript):
         for f in fmt_list:
             if f == "md":
                 p = job.dir / "transcript.md"
-                p.write_text(full_text, encoding="utf-8")
+                p.write_text(head + full_text if head else full_text, encoding="utf-8")
                 exported.append({"name":"Markdown","file":"transcript.md","size":p.stat().st_size})
             elif f == "txt":
                 p = job.dir / "transcript.txt"
@@ -552,7 +795,7 @@ def export_formats(job, transcript):
                 exported.append({"name":"TXT","file":"transcript.txt","size":p.stat().st_size})
             elif f == "json":
                 p = job.dir / "transcript.json"
-                p.write_text(json.dumps({"segments":segments,"total":len(segments)},ensure_ascii=False,indent=2),encoding="utf-8")
+                p.write_text(json.dumps({"segments":segments,"total":len(segments),"enrichment":enrichment},ensure_ascii=False,indent=2),encoding="utf-8")
                 exported.append({"name":"JSON","file":"transcript.json","size":p.stat().st_size})
             elif f == "srt":
                 p = job.dir / "transcript.srt"
@@ -560,8 +803,79 @@ def export_formats(job, transcript):
                 exported.append({"name":"SRT","file":"transcript.srt","size":p.stat().st_size})
     return exported
 
+def _parse_srt_to_transcript(srt_path):
+    """解析 SRT 字幕 → {text, segments}（与 ASR 输出同构）。失败返回 None。"""
+    try:
+        content = Path(srt_path).read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return None
+    segments = []
+    parts = []
+    for blk in re.split(r'\n\s*\n', content.strip()):
+        lines = [l for l in blk.strip().split('\n') if l.strip()]
+        if len(lines) < 2:
+            continue
+        tline = None
+        tidx = 0
+        for i, l in enumerate(lines):
+            if '-->' in l:
+                tline = l
+                tidx = i
+                break
+        if not tline:
+            continue
+        m = re.match(r'\s*(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)', tline)
+        if m:
+            g = m.groups()
+            start = int(g[0]) * 3600 + int(g[1]) * 60 + int(g[2]) + int(g[3]) / 1000
+            end = int(g[4]) * 3600 + int(g[5]) * 60 + int(g[6]) + int(g[7]) / 1000
+        else:
+            m2 = re.match(r'\s*(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+)[,.](\d+)', tline)
+            if not m2:
+                continue
+            g = m2.groups()
+            start = int(g[0]) * 60 + int(g[1]) + int(g[2]) / 1000
+            end = int(g[3]) * 60 + int(g[4]) + int(g[5]) / 1000
+        text = ' '.join(lines[tidx + 1:]).strip()
+        if not text:
+            continue
+        segments.append({"id": len(segments), "start": start, "end": end, "text": text})
+        parts.append(text)
+    if not segments:
+        return None
+    return {"text": " ".join(parts), "segments": segments}
+
+
+def _try_subtitle_transcript(job):
+    """字幕优先：扫描 raw/ 下平台字幕（B站 ai-zh.srt 优先，其次任意 .srt），
+    有则解析为 {text, segments} 返回，无则 None。仅 engine=auto 时调用。"""
+    raw = job.dir / "raw"
+    if not raw.exists():
+        return None
+    cands = []
+    for p in raw.glob("*.srt"):
+        name = p.name.lower()
+        if "ai-zh" in name or "ai_cn" in name or name.endswith(".zh.srt"):
+            cands.insert(0, p)
+        elif "zh" in name:
+            cands.append(p)
+    if not cands:
+        cands = list(raw.glob("*.srt"))
+    for p in cands:
+        try:
+            if p.stat().st_size < 50:
+                continue
+        except Exception:
+            continue
+        t = _parse_srt_to_transcript(p)
+        if t and t.get("text"):
+            t["_subtitle_source"] = p.name
+            return t
+    return None
+
+
 def run_transcribe_pipeline(job):
-    """Full pipeline: download → audio → transcribe → export (for online transcription)"""
+    """Full pipeline: download → (字幕优先 | audio→ASR) → export (for online transcription)"""
     try:
         job.status = "resolving"; job.progress = 10
         video = download_video(job)
@@ -570,18 +884,28 @@ def run_transcribe_pipeline(job):
             if not job.error: job.error = "视频下载失败"
             return
 
-        job.status = "extracting"; job.progress = 30
-        audio = job.dir / "raw" / "audio.mp3"
-        audio.parent.mkdir(exist_ok=True)
-        if not extract_audio(video, audio):
-            job.status = "error"; job.error = "音频提取失败"; return
+        transcript = None
+        # 字幕优先：engine=auto 时，有平台字幕(B站 ai-zh 等)就直接用、跳过 ASR（秒级、免额度）
+        if (getattr(job, "engine", "auto") or "auto") == "auto":
+            transcript = _try_subtitle_transcript(job)
+            if transcript:
+                job.engine_used = "subtitle"
+                job.engine_note = "使用平台字幕（免 ASR）"
+                job.error = None
 
-        job.status = "transcribing"; job.progress = 60
-        transcript = transcribe(audio, job)
         if not transcript:
-            job.status = "error"
-            if not job.error: job.error = "转录失败"
-            return
+            job.status = "extracting"; job.progress = 30
+            audio = job.dir / "raw" / "audio.mp3"
+            audio.parent.mkdir(exist_ok=True)
+            if not extract_audio(video, audio):
+                job.status = "error"; job.error = "音频提取失败"; return
+
+            job.status = "transcribing"; job.progress = 60
+            transcript = transcribe(audio, job)
+            if not transcript:
+                job.status = "error"
+                if not job.error: job.error = "转录失败"
+                return
 
         (job.dir / "raw" / "tele_result.json").write_text(json.dumps(transcript, ensure_ascii=False, indent=2))
         job.title = (transcript.get("text","")[:80] + "...") if len(transcript.get("text",""))>80 else transcript.get("text","")
@@ -591,7 +915,8 @@ def run_transcribe_pipeline(job):
             job.duration = f"{int(t)//60:02d}:{int(t)%60:02d}"
 
         job.status = "exporting"; job.progress = 85
-        job.files = export_formats(job, transcript)
+        enrichment = _enrich_transcript(transcript.get("text", ""), job)
+        job.files = export_formats(job, transcript, enrichment)
         job.status = "done"; job.progress = 100
     except Exception as e:
         job.status = "error"; job.error = str(e)
@@ -610,11 +935,16 @@ def run_local_pipeline(job, file_path):
             if not extract_audio(str(fp), audio_path):
                 job.status = "error"; job.error = "音频提取失败"; return
         else:
-            shutil.copy2(str(fp), audio_path)
+            # 音频文件：若已是目标路径(如上传文件就叫 audio.mp3)则直接用，否则复制
+            if fp.resolve() != audio_path.resolve():
+                shutil.copy2(str(fp), audio_path)
 
         job.status = "transcribing"; job.progress = 50
         transcript = transcribe(audio_path, job)
-        if not transcript: return
+        if not transcript:
+            job.status = "error"
+            if not job.error: job.error = "转录失败"
+            return
 
         (job.dir / "raw" / "tele_result.json").write_text(json.dumps(transcript, ensure_ascii=False, indent=2))
         job.title = fp.name
@@ -624,7 +954,8 @@ def run_local_pipeline(job, file_path):
             job.duration = f"{int(t)//60:02d}:{int(t)%60:02d}"
 
         job.status = "exporting"; job.progress = 85
-        job.files = export_formats(job, transcript)
+        enrichment = _enrich_transcript(transcript.get("text", ""), job)
+        job.files = export_formats(job, transcript, enrichment)
         job.status = "done"; job.progress = 100
     except Exception as e:
         job.status = "error"; job.error = str(e)

@@ -481,6 +481,14 @@ Parse the SRT or JSON output and check:
 2. Compare with the actual audio duration from ffprobe.
 3. If the gap > 5 seconds, flag as potential truncation.
 
+### Content-Enrich（文稿增强，自动）
+
+转录后 `run_transcribe_pipeline` / `run_local_pipeline` 自动调用 `_enrich_transcript()`：
+用 SiliconFlow chat API（`deepseek-ai/DeepSeek-V3`，复用 SILICONFLOW_API_KEY）给文稿补
+**一句话摘要 + 3-5 条要点 + 3-5 个标签**，经 `_enrichment_block()` 渲染成 `## 📝 摘要` 块
+写入 `transcript.md` 顶部（原文完整保留），JSON 也带 `enrichment` 字段。
+**best-effort**：无 Key / 失败 / 文稿过短时静默跳过，不阻断主流程。参考 chubbyguan/chubbyskills 的 content-enrich。
+
 ---
 
 ## Phase 4: Content Structuring — Chapter Breakdown
@@ -867,17 +875,41 @@ Correction rules for Chinese transcription:
 - Requires cookies for 1080p+ quality. Use `--cookies-from-browser chrome`.
 - Multi-part videos (分P): `yt-dlp` downloads all parts by default. Use
   `--playlist-items 1` to download a specific part.
-- Subtitles (弹幕 / AI字幕): Phase 1 的 `--write-subs --sub-langs all` 会**自动下载
-  B站平台生成的 AI 字幕**（`ai-zh`/`ai-en`/`ai-ja` 等多语种 .srt），同时抓弹幕 xml。
-  这些 AI 字幕可作为转录参考或兜底（Failsafe：ASR 全失败时直接用 `ai-zh.srt`）。
-  注意：**不是所有 B站视频都有 AI 字幕**（仅平台已生成的才有）；弹幕本身 yt-dlp 不直接支持。
+- Subtitles (弹幕 / AI字幕) — **字幕优先**：Phase 1 的 `--write-subs --sub-langs all` 会
+  **自动下载 B站平台生成的 AI 字幕**（`ai-zh`/`ai-en`/`ai-ja` 等多语种 .srt）。
+  `run_transcribe_pipeline` 在 `engine=auto` 时**优先用 `ai-zh.srt` 直接当文稿、跳过 ASR**
+  （秒级、免额度），无字幕才走豆包等 ASR。手动指定 engine（doubao/tele/…）则强制 ASR。
+  `_try_subtitle_transcript()` 扫 raw/ 找 ai-zh 优先、其次任意 .srt；`_parse_srt_to_transcript()` 解析。
+  注意：**不是所有 B站视频都有 AI 字幕**（仅平台已生成的才有）；抖音 iesdouyin 不提供字幕。
 
-### Douyin (抖音) — CRITICAL: Anti-Bot Strategy
+### Douyin (抖音) — iesdouyin 无 Cookie 首选
 
-Douyin aggressively detects headless browsers. The following strategy is
-**battle-tested** across multiple downloads.
+抖音对未登录态返回 403。**首选 iesdouyin 分享接口（无需 cookie/登录/yt-dlp）**，
+失败再退 yt-dlp(带 cookie)/Playwright。参考实现：chubbyguan/chubbyskills。
 
-#### ⚠️ Gold Rules for Douyin Download
+#### ✅ Tier 1: iesdouyin 分享接口（首选，无 cookie）
+
+`webui/pipeline.py` 的 `_download_douyin_iesdouyin()` 已实现：
+1. 提取 video id（短链跟重定向，`/video/(\d+)`）
+2. 抓 `https://www.iesdouyin.com/share/video/<id>`（**移动端 iPhone UA**）
+3. 正则提取 `window._ROUTER_DATA` → `loaderData["video_(id)/page"]["videoInfoRes"]["item_list"][0]`
+4. 取 `video.play_addr.url_list[0]`，`playwm`→`play` 去水印
+5. curl 下载（移动端 UA + `Referer: https://www.douyin.com/`），顺带拿视频标题
+
+```bash
+curl -s -L -H "User-Agent: <iPhone UA>" "https://www.iesdouyin.com/share/video/<vid>" \
+  | grep -oP 'window\._ROUTER_DATA\s*=\s*\K.*?(?=</script>)'  # 提取 JSON
+# 拿到 play_addr 后：
+curl -s -L -o video.mp4 -H "User-Agent: <iPhone UA>" -H "Referer: https://www.douyin.com/" "<play_url>"
+```
+
+实测：两个抖音视频（2:13 / 10:41）均一次成功，下载的视频**带音轨**，配合豆包转录 11.7s / 55.6s 出文稿。
+
+#### 兜底（iesdouyin 失败时才用）
+
+抖音反爬强，下列方法需要 cookie 或浏览器自动化，作为 iesdouyin 失败后的退路：
+
+#### ⚠️ Gold Rules for Douyin Download (兜底层)
 
 1. **NEVER reuse a browser session** after it's been flagged (captcha page).
    Always `playwright-cli close` and `open` fresh for each video.
@@ -887,9 +919,9 @@ Douyin aggressively detects headless browsers. The following strategy is
 4. **Detect captcha early.** If page title contains "验证码", abort immediately and
    retry with a fresh session after 30s delay.
 
-#### Download Strategy (ordered by reliability)
+#### Download Strategy — 兜底链路（iesdouyin 失败后，按可靠性排序）
 
-**Tier 1: MediaRecorder (most reliable, ~video_duration seconds)**
+**Tier 2: MediaRecorder (most reliable, ~video_duration seconds)**
 
 This approach bypasses ALL bot detection because it records the video as it plays:
 ```bash
@@ -931,7 +963,7 @@ playwright-cli eval "
 cp .playwright-cli/video.webm vN/raw/video.mp4
 ```
 
-**Tier 2: page.route interception (faster, but browser fingerprint must match)**
+**Tier 3: page.route interception (faster, but browser fingerprint must match)**
 
 If MediaRecorder is too slow (video > 3min), try intercepting the video URL
 from network requests:
@@ -950,7 +982,7 @@ playwright-cli eval "
 # Then download with curl (cookies MUST match)
 ```
 
-**Tier 3: yt-dlp (rarely works for Douyin)**
+**Tier 4: yt-dlp (rarely works for Douyin)**
 Only try if both Tier 1 and Tier 2 fail. Known failure: "Fresh cookies needed",
 "Failed to parse JSON".
 
@@ -993,17 +1025,14 @@ Only try if both Tier 1 and Tier 2 fail. Known failure: "Fresh cookies needed",
 
 ### Xiaohongshu (小红书)
 
-- Cookies are mandatory. Use `--cookies-from-browser chrome` or a cookies.txt.
+- **首选：`__INITIAL_STATE__` 解析（移动端 UA，cookie 可选）**——`webui/pipeline.py` 的
+  `_download_xhs_initial_state()` 已实现：移动端 iPhone UA + Referer，括号配平提取
+  `window.__INITIAL_STATE__`，递归定位 note，从 `video.media.stream.{h264,h265,h266,av1}[].masterUrl`
+  提直链下载。可选 `XHS_COOKIE` 环境变量提高成功率（风控严时需要）。参考 chubbyguan/chubbyskills。
+- **兜底：yt-dlp + cookie**——`__INITIAL_STATE__` 失败才走，需 `--cookies-from-browser chrome` 或 cookies.txt。
 - **Referer header is critical**: always add `--add-header "Referer:https://www.xiaohongshu.com/"`.
-- **M3U8 streams**: Many Xiaohongshu videos use HLS/M3U8 segmented streaming.
-  yt-dlp handles this natively but may need `--concurrent-fragments 5` for speed.
-- **Watermark**: Default download includes watermark. To get watermark-free,
-  look for the `source` or `origin` video stream in the page HTML.
-- **Playwright fallback**: If yt-dlp fails (common due to API changes):
-  1. Open the video page in Playwright with cookies injected
-  2. Wait for video element to load
-  3. Extract `document.querySelector('video').src`
-  4. Download with curl + cookies + Referer header
+- **M3U8 streams**: Some Xiaohongshu videos use HLS/M3U8；yt-dlp 原生支持，可加 `--concurrent-fragments 5`。
+- **风控检测**：响应含「请通过小红书」或 `verify` 即被拦，提示设 `XHS_COOKIE`。
 - Short video format (< 5 min) — skip parallel shard extraction.
 
 ### YouTube
