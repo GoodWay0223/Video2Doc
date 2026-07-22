@@ -34,6 +34,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # SCRIPT_DIR = Video2Doc/ (since video2doc.sh is at repo root)
 
+# Windows Git Bash commonly exposes a non-working Microsoft Store `python3`
+# alias. Resolve and execute-test the interpreter before doing any work.
+source "$SCRIPT_DIR/scripts/python_cmd.sh"
+PYTHON_BIN="$(video2doc_find_python)" || exit 1
+export VIDEO2DOC_PYTHON="$PYTHON_BIN"
+
 # Load config (API key etc.)
 source "$SCRIPT_DIR/scripts/load_config.sh" 2>/dev/null || true
 
@@ -60,7 +66,10 @@ while [[ $# -gt 0 ]]; do
     --verbose) VERBOSE=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --help|-h)
-      head -30 "$0" | grep "^#" | sed 's/^# \?//'
+      awk 'NR > 1 && NR <= 30 {
+        if ($0 == "#") print "";
+        else if (substr($0, 1, 2) == "# ") print substr($0, 3)
+      }' "$0"
       exit 0
       ;;
     *) LINKS+=("$1"); shift ;;
@@ -108,7 +117,7 @@ for i in "${!LINKS[@]}"; do
   FULL_URL=$(curl -sI -o /dev/null -w "%{url_effective}" -L "$LINK" 2>/dev/null || echo "$LINK")
   VIDEO_ID=$(echo "$FULL_URL" | grep -oE 'video/([0-9]+)' | cut -d/ -f2 || echo "unknown")
   TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-  PROJ_DIR="${OUTPUT_DIR:-./output}/${VIDEO_ID:-v$TIMESTAMP}"
+  PROJ_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/output}/${VIDEO_ID:-v$TIMESTAMP}"
   mkdir -p "$PROJ_DIR/raw"
 
   if [ "$DRY_RUN" = true ]; then
@@ -151,22 +160,26 @@ for i in "${!LINKS[@]}"; do
 
     # Phase 4: Apply corrections + Export
     echo "  📝 Exporting ($FORMATS)..."
-    CORRECT_FLAG=""
-    [ -n "$DOMAIN" ] && CORRECT_FLAG="--correct --domain $DOMAIN"
+    CORRECT_ARGS=()
+    [ -n "$DOMAIN" ] && CORRECT_ARGS=(--correct --domain "$DOMAIN")
 
     IFS=',' read -ra FMT_ARR <<< "$FORMATS"
     for fmt in "${FMT_ARR[@]}"; do
-      python3 "$SCRIPT_DIR/export_formats.py" \
+      "$PYTHON_BIN" "$SCRIPT_DIR/scripts/export_formats.py" \
         --input "$PROJ_DIR/raw/tele_result.json" \
         --format "$fmt" \
         --output-dir "$PROJ_DIR" \
-        $CORRECT_FLAG 2>/dev/null || true
+        "${CORRECT_ARGS[@]}" 2>/dev/null || true
     done
     echo "  ✅ Exports: $(ls "$PROJ_DIR"/transcript.* 2>/dev/null | tr '\n' ' ')"
-    ((SUCCESS++))
+    SUCCESS=$((SUCCESS + 1))
   elif [ -f "$AUDIO_FILE" ]; then
     echo "  ⚠️  No API key configured. Skipping transcription."
     echo "  Run: source scripts/load_config.sh"
+    FAILED=$((FAILED + 1))
+  else
+    echo "  ❌ No downloaded video/audio available for transcription."
+    FAILED=$((FAILED + 1))
   fi
 
   echo ""
@@ -175,4 +188,4 @@ done
 # ─── Summary ──────────────────────────────────────────────
 echo "═══════════════════════════════════════════════════════"
 echo "  ✅ $SUCCESS succeeded  ❌ $FAILED failed"
-echo "  Output: ${OUTPUT_DIR:-./output}/"
+echo "  Output: ${OUTPUT_DIR:-$SCRIPT_DIR/output}/"

@@ -1,5 +1,56 @@
 # Changelog
 
+## [Unreleased]
+
+暂无。
+
+## [v0.6.0] — 2026-07-22
+
+### Security
+- Web 服务默认仅监听 `127.0.0.1`，移除通配 CORS。
+- 修复下载路径穿越和上传文件名越界写入；上传文件使用服务端生成的落盘名。
+- JSON / 上传请求增加读取前大小限制，文件下载改为流式返回。
+- 前端移除不可信 `innerHTML` 与 inline 事件处理，结果和历史记录改为安全 DOM 渲染。
+- 输入 URL 限制为支持平台的 HTTP/HTTPS 域名，并拒绝凭据、异常端口和伪装域名。
+
+### Added
+- 云端摘要增强开关，以及本地媒体的“仅本地处理”隐私模式。
+- 隐私模式保留本地 `auto` 降级链，按 FunASR → Whisper 兜底，不再被前端强制锁定到 FunASR。
+- `local_only` / `allow_enrichment` Job 字段及服务端强制执行。
+- 首页运行时能力状态：只公开下载/引擎就绪布尔值，不返回凭据或本机路径。
+- Windows/macOS 一键启动器、跨平台可执行文件发现和 UTF-8 控制台/子进程处理。
+- Windows/macOS GitHub Actions 矩阵，执行 Python 3.10/3.11 核心回归、启动器与发布包冒烟检查。
+- 可复现的跨平台发布构建器：生成版本化 ZIP、SHA-256 和包内 `RELEASE-MANIFEST.json`，自动排除密钥、缓存、媒体与运行产物。
+- 组件版本健康检查：默认离线读取 Python、FFmpeg、ffprobe、curl、yt-dlp 与 JavaScript runtime；yt-dlp 低于内置最低版本时不再标为就绪。
+- 用户显式触发的 PyPI 最新稳定版只读检查，以及适配 uv tool、pip 或独立版的手动升级建议；启动和首页不会自动联网或执行升级。
+- Dependabot 每周提高 yt-dlp 已测试最低基线；计划 CI 每周在 Windows/macOS、Python 3.10/3.11 上重新验证当时的最新稳定版。
+- 依赖清单、密钥变量示例、跨平台换行规则和 57 项安全/正确性/发布回归测试。
+- API Key 仅从显式 Video2Doc 配置读取，且不再出现在 curl 进程参数中；摘要正文改为进程内 HTTPS 请求。
+- 首页和本地文件弹窗增加隐私模式入口提示、启用条件、数据边界及可展开的安装步骤；README 增加完整使用说明。
+
+### Fixed
+- yt-dlp Chrome Cookie 调用失败后会正确重试无 Cookie 下载。
+- Windows URL 解析改用 `os.devnull`。
+- 上下文校正规则、正则捕获组、领域参数和单格式文件导出。
+- 自检现在识别真实 Python Playwright、云端 Key、本地引擎和用户级 yt-dlp。
+- CLI exporter 路径及成功/失败计数。
+- 首页删除无依据的准确率、高清无水印、永久免费等承诺；明确三个处理入口、字幕优先策略、四种文稿格式和小红书实验状态。
+- 隐藏尚未接入 Web pipeline 的领域选择及未正确返回视频的“下载后转录”组合控件。
+- 运行时状态区分“已配置/已安装”与“实际验证可用”；TXT/SRT 自动禁止无产物的云端摘要调用。
+- JSON/SRT 单格式导出时，结果页仍可从标准化转录结果生成统一文本预览。
+- macOS Finder/Homebrew/MacPorts 与 Windows WinGet/Scoop/Chocolatey/uv/虚拟环境下的 ffmpeg、ffprobe、curl、yt-dlp 和浏览器发现。
+- Shell 脚本统一选择真实可用的 Python 3.10+，与当前 yt-dlp 的最低版本一致；避免 Windows Store 的无效 `python3` 别名，并移除 macOS BSD grep 不支持的 `-P` 用法。
+- `verify_html.py` 支持 Windows Chrome/Edge 路径、跨平台 `file://` URI 和 UTF-8 输出。
+
+### Changed
+- Web UI 推荐入口统一为原生 Python：Windows 使用 `start-video2doc.cmd`，macOS 使用 `start-video2doc.command`；实验性 Bash CLI 继续保留。
+- `scripts/check_setup.sh` 委托跨平台 Python 自检，避免 Shell 与 Web UI 的能力判断漂移。
+- 默认监听地址固定为 `127.0.0.1`；局域网监听必须显式指定 `--host 0.0.0.0`，且当前仍不提供认证或 HTTPS。
+
+### Verification
+- 本地 Windows：57/57 Python 单元测试、Python 编译、JavaScript 语法、Shell 语法和浏览器桌面/移动端检查通过。
+- GitHub Actions：`windows-latest` 与 `macos-latest` 运行 Python 3.10/3.11 核心回归、启动器及发布包 smoke；不等同于真实平台媒体/API 端到端验证。
+
 ## [v0.5.0] — 2026-07-09（大版本：下载链路全面优化 + 字幕优先 + 文稿增强）
 
 ### Added
@@ -33,8 +84,9 @@
 ## [v0.4.3] — 2026-07-08
 
 ### Added
-- **豆包录音文件识别大模型 2.0（云端首选）**：接入火山引擎豆包 ASR，实测中文准确率 78%，
-  显著优于 TeleSpeechASR（22%）。异步 submit+query、base64 内联音频、自带标点+ITN+词级时间戳。
+- **豆包录音文件识别大模型 2.0（云端首选）**：接入火山引擎豆包 ASR；一次项目样本的
+  9 个关键术语命中 7/9（TeleSpeechASR 为 2/9），该结果不代表通用准确率或 WER 基准。
+  异步 submit+query、base64 内联音频、自带标点+ITN+词级时间戳。
   严格按官方文档处理响应头 `X-Api-Status-Code`（20000000 成功 / 20000001·2 处理中排队 /
   20000003 静音 / 4xxxxx·5xxxxx 错误），捕获 `X-Tt-Logid` 便于排错。
   用 `urllib` 而非 curl（规避 ARG_MAX 限制、可直接读响应头）。
@@ -57,7 +109,7 @@
 - 3 个 py 文件语法 OK + webui 包导入 OK
 - 引擎选择逻辑测试全正确（auto 全失败 / 强制引擎失败 / 未知引擎 / auto 降级 + engine_note）
 - 豆包独立测试矩阵 4/4 通过（new 鉴权 × url/base64）；B站 6:43 音频 ~35s 完成、75 段、末段 402s
-- 豆包 vs TeleSpeechASR 准确率对比：9 关键术语 7/9 vs 2/9
+- 豆包 vs TeleSpeechASR 单次样本关键术语命中：7/9 vs 2/9（非通用准确率基准）
 
 ## [v0.4.2] — 2026-07-02
 

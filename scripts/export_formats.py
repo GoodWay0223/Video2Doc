@@ -74,28 +74,19 @@ def to_md(segments, title="", source=""):
             lines.append(text + "\n")
     return "\n".join(lines)
 
-def apply_corrections_to_segments(segments, corrections_script):
-    """Run corrections script on all segment texts"""
-    import subprocess
-    import tempfile
+def apply_corrections_to_segments(segments, corrections_script=None, domain=None):
+    """Apply rules to each segment independently so embedded newlines stay intact."""
+    if corrections_script:
+        raise ValueError("custom correction scripts are no longer supported")
+    try:
+        from .apply_corrections import load_rules, apply_corrections
+    except ImportError:
+        from apply_corrections import load_rules, apply_corrections
 
-    combined = "\n".join(seg.get("text", "") for seg in segments)
-    script_path = str(Path(__file__).parent / "apply_corrections.py")
-
-    result = subprocess.run(
-        [sys.executable, script_path],
-        input=combined, capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        print(f"Warning: corrections failed: {result.stderr}", file=sys.stderr)
-        return segments
-
-    corrected_lines = result.stdout.strip().split("\n")
-    for i, seg in enumerate(segments):
-        if i < len(corrected_lines):
-            seg["text"] = corrected_lines[i]
-        else:
-            break
+    exact, context, fuzzy = load_rules(domain)
+    for seg in segments:
+        original = seg.get("text", "")
+        seg["text"] = apply_corrections(original, exact, context, fuzzy)
     return segments
 
 def main():
@@ -114,7 +105,7 @@ def main():
 
     # Read input
     if args.input:
-        with open(args.input) as f:
+        with open(args.input, encoding="utf-8") as f:
             data = json.load(f)
     else:
         data = json.load(sys.stdin)
@@ -128,7 +119,7 @@ def main():
 
     # Apply corrections if requested
     if args.correct:
-        segments = apply_corrections_to_segments(segments, None)
+        segments = apply_corrections_to_segments(segments, domain=args.domain)
 
     # Generate output
     outputs = {}
@@ -144,11 +135,11 @@ def main():
         elif fmt == "md":
             outputs["transcript.md"] = to_md(segments, args.title or "", args.source or "")
 
-    if args.format == "all" and args.output_dir:
+    if args.output_dir:
         os.makedirs(args.output_dir, exist_ok=True)
         for name, content in outputs.items():
             path = os.path.join(args.output_dir, name)
-            with open(path, 'w') as f:
+            with open(path, 'w', encoding="utf-8") as f:
                 f.write(content)
             print(f"  ✅ {path}")
     else:

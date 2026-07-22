@@ -5,6 +5,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python_cmd.sh"
+PYTHON_BIN="$(video2doc_find_python)"
+
 AUDIO="${1:?Usage: $0 <AUDIO_MP3> <OUTPUT_DIR> <LANGUAGE>}"
 OUTPUT_DIR="${2:?Usage: $0 <AUDIO_MP3> <OUTPUT_DIR> <LANGUAGE>}"
 LANG="${3:-zh}"
@@ -36,7 +40,16 @@ SRT_OUTPUT="$OUTPUT_DIR/${AUDIO_NAME}.srt"
 echo "=== Transcribing: $AUDIO ==="
 echo "Model: $MODEL, Language: $WHISPER_LANG"
 
-whisper "$AUDIO" \
+if command -v whisper >/dev/null 2>&1; then
+    WHISPER=(whisper)
+elif "$PYTHON_BIN" -c "import whisper" >/dev/null 2>&1; then
+    WHISPER=("$PYTHON_BIN" -m whisper)
+else
+    echo "ERROR: openai-whisper not found." >&2
+    exit 1
+fi
+
+"${WHISPER[@]}" "$AUDIO" \
     --model "$MODEL" \
     --language "$WHISPER_LANG" \
     --output_format srt \
@@ -48,19 +61,19 @@ whisper "$AUDIO" \
 if [[ -f "$SRT_OUTPUT" ]]; then
     AUDIO_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$AUDIO")
     
-    LAST_END=$(python3 -c "
-import re
-with open('$SRT_OUTPUT') as f:
+    LAST_END=$("$PYTHON_BIN" -c '
+import re, sys
+with open(sys.argv[1], encoding="utf-8", errors="replace") as f:
     text = f.read()
-segments = re.findall(r'(\d{2}):(\d{2}):(\d{2})[,\.]\d{3}\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,\.]\d{3}', text)
+segments = re.findall(r"(\d{2}):(\d{2}):(\d{2})[,\.]\d{3}\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,\.]\d{3}", text)
 if segments:
     h, m, s = map(int, segments[-1][3:6])
     print(h * 3600 + m * 60 + s)
 else:
     print(0)
-")
+' "$SRT_OUTPUT")
     
-    python3 -c "
+    "$PYTHON_BIN" -c "
 a = float($AUDIO_DUR)
 l = float($LAST_END)
 gap = a - l

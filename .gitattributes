@@ -1,0 +1,12 @@
+* text=auto
+
+# Shell scripts must keep LF so they run correctly in Git Bash, WSL, macOS, and Linux.
+*.sh text eol=lf
+*.command text eol=lf
+*.cmd text eol=crlf
+
+# Keep source and documentation line endings stable across platforms.
+*.py text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.md text eol=lf

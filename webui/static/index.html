@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video2Doc — 视频工坊</title>
+<title>Video2Doc — 视频下载与转文稿</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E">
 <style>
 :root {
   --purple-start: #6366f1;
@@ -65,10 +66,19 @@ body {
 .hero-title { font-size: 2.3rem; font-weight: 800; margin-bottom: .5rem; position:relative; z-index:2; text-shadow: 0 2px 14px rgba(0,0,0,.18); letter-spacing: -.5px; }
 .hero-subtitle { font-size: 1.05rem; opacity: .92; position:relative; z-index:2; margin-bottom: 1.6rem; font-weight:400; }
 .stats-row { display:flex; justify-content:center; gap:1.5rem; position:relative; z-index:2; flex-wrap:wrap; }
-.stat-item { text-align:center; background: rgba(255,255,255,.13); border-radius: 14px; padding: 1.1rem 1.7rem; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.22); transition: transform .35s cubic-bezier(.16,1,.3,1), background .35s; min-width: 110px; }
+.stat-item { text-align:center; background: rgba(255,255,255,.13); border-radius: 14px; padding: 1.1rem 1.7rem; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.22); transition: transform .35s cubic-bezier(.16,1,.3,1), background .35s; min-width: 150px; }
 .stat-item:hover { transform: translateY(-4px); background:rgba(255,255,255,.22); }
 .stat-number { font-size:1.9rem; font-weight:800; color:#fff; line-height:1; text-shadow: 0 2px 10px rgba(0,0,0,.25); margin-bottom:.3rem; letter-spacing:-.5px; }
 .stat-label { font-size:.82rem; color:rgba(255,255,255,.92); font-weight:500; }
+.runtime-status { display:flex; align-items:flex-start; gap:.65rem; margin:-.5rem auto 1.6rem; padding:.8rem 1rem; max-width:760px; border:1px solid #ddd6fe; border-radius:12px; background:#f5f3ff; color:#4c1d95; font-size:.82rem; line-height:1.55; }
+.runtime-status.ready { border-color:#a7f3d0; background:#ecfdf5; color:#065f46; }
+.runtime-status.warn { border-color:#fde68a; background:#fffbeb; color:#92400e; }
+.runtime-dot { width:9px; height:9px; margin-top:.34rem; border-radius:50%; background:currentColor; flex:0 0 auto; box-shadow:0 0 0 4px color-mix(in srgb,currentColor 14%,transparent); }
+.runtime-copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:.2rem; }
+.runtime-components { font-size:.75rem; opacity:.86; overflow-wrap:anywhere; }
+.runtime-update-btn { flex:0 0 auto; border:1px solid currentColor; border-radius:8px; padding:.35rem .6rem; background:transparent; color:inherit; font:inherit; font-size:.73rem; font-weight:600; cursor:pointer; }
+.runtime-update-btn:hover { background:rgba(255,255,255,.55); }
+.runtime-update-btn:disabled { cursor:wait; opacity:.58; }
 
 /* ─── Section Title ─────────────────── */
 .section-title { text-align:center; margin-bottom: 1.5rem; font-size: 1.3rem; font-weight: 700; color: var(--text-dark); letter-spacing:-.3px; }
@@ -91,6 +101,7 @@ body {
 .tag.green { background: #d1fae5; color: #047857; }
 .tag.blue { background: #dbeafe; color: #1d4ed8; }
 .tag.purple { background: #ede9fe; color: #6d28d9; }
+.tag.amber { background: #fef3c7; color: #92400e; }
 .card .btn { width:100%; border:none; border-radius: 12px; padding: .72rem 1.5rem; font-size: .9rem; font-weight: 600; cursor: pointer; transition: filter .2s, transform .2s, box-shadow .2s; position:relative; overflow:hidden; margin-top: auto; color:white; }
 .card .btn:hover { transform: translateY(-1px); }
 .btn-download { background: linear-gradient(135deg, #ef4444, #dc2626); }
@@ -136,6 +147,22 @@ body {
 .opts-row select:focus { border-color: var(--purple-start); }
 .opts-row label { display:flex; align-items:center; gap:6px; font-size: .82rem; color: var(--text-muted); cursor: pointer; user-select:none; }
 .opts-row input[type=checkbox] { width:15px; height:15px; accent-color: var(--purple-start); cursor:pointer; }
+.privacy-options { display:grid; gap:7px; margin:-.2rem 0 1rem; padding:.8rem .9rem; border:1px solid var(--border); border-radius:10px; background:#faf9fe; }
+.privacy-heading { color:var(--text-dark); font-size:.84rem; font-weight:700; margin-bottom:1px; }
+.privacy-option { display:flex; align-items:center; gap:8px; min-height:44px; color:var(--text-dark); font-size:.82rem; font-weight:600; cursor:pointer; }
+.privacy-option input { width:16px; height:16px; margin:0; flex:0 0 auto; accent-color:var(--purple-start); cursor:pointer; }
+.privacy-option:has(input:disabled) { color:var(--text-light); cursor:not-allowed; }
+.privacy-option input:disabled { cursor:not-allowed; }
+.privacy-note { color:var(--text-muted); font-size:.8rem; line-height:1.55; padding-left:24px; }
+.privacy-note strong { color:#4f46e5; }
+.privacy-guide { margin-top:4px; border-top:1px solid var(--border); padding-top:9px; }
+.privacy-guide summary { color:#047857; font-size:.82rem; font-weight:700; cursor:pointer; list-style-position:outside; margin-left:18px; padding:4px 0; }
+.privacy-guide-content { color:var(--text-muted); font-size:.79rem; line-height:1.65; padding:7px 4px 1px 24px; }
+.privacy-guide-content ol { margin:0 0 8px 1.1rem; }
+.privacy-guide-content li + li { margin-top:4px; }
+.privacy-guide-content code { display:block; overflow-x:auto; margin:4px 0; padding:5px 7px; border:1px solid #d1fae5; border-radius:6px; background:#ecfdf5; color:#065f46; font-family:Consolas,'Courier New',monospace; font-size:.75rem; white-space:nowrap; }
+.privacy-boundary { margin-top:7px; padding:7px 9px; border-left:3px solid #10b981; background:#ecfdf5; color:#065f46; }
+.privacy-boundary code { display:inline; margin:0; padding:1px 3px; border:0; background:rgba(255,255,255,.58); white-space:normal; }
 
 /* ─── Progress Steps ────────────────── */
 .progress-steps { display:flex; justify-content:space-between; margin: 1.5rem 0 1rem; flex-wrap:wrap; gap: .5rem; }
@@ -190,7 +217,7 @@ body {
 .history-section { margin-top: 1.5rem; }
 .history-section h4 { font-size: .92rem; color: var(--text-muted); margin-bottom: .8rem; font-weight:600; }
 .history-list { display:flex; flex-direction:column; gap:6px; }
-.history-item { display:flex; align-items:center; gap:10px; padding: 9px 13px; background: #faf9fe; border: 1px solid var(--border); border-radius: 10px; cursor:pointer; font-size:.85rem; transition: background .15s, transform .15s; }
+.history-item { display:flex; width:100%; align-items:center; gap:10px; padding: 9px 13px; background: #faf9fe; border: 1px solid var(--border); border-radius: 10px; cursor:pointer; font:inherit; text-align:left; font-size:.85rem; transition: background .15s, transform .15s; }
 .history-item:hover { background: #f1eefb; transform:translateX(2px); }
 .history-item .hist-icon { font-size: 1rem; }
 .history-item .hist-title { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color: var(--text-dark); }
@@ -222,6 +249,12 @@ body {
   .step-label { font-size:.68rem; }
   .input-row { flex-direction:column; }
   .opts-row { flex-direction:column; align-items:flex-start; }
+  .opts-row select { width:100%; }
+  .privacy-note { padding-left:0; }
+  .privacy-guide-content { padding-left:4px; }
+  .runtime-status { flex-wrap:wrap; }
+  .runtime-copy { flex-basis:calc(100% - 1.8rem); }
+  .runtime-update-btn { margin-left:1.25rem; }
 }
 </style>
 </head>
@@ -232,42 +265,48 @@ body {
   <!-- Hero -->
   <div class="hero-section">
     <div class="hero-wave" id="hero-wave"></div>
-    <h1 class="hero-title">🎬 Video2Doc · 视频工坊</h1>
-    <p class="hero-subtitle">下载 / 转录 / 处理 · 一站式视频工具</p>
+    <h1 class="hero-title">🎬 Video2Doc · 视频下载与转文稿</h1>
+    <p class="hero-subtitle">下载平台视频，或将视频链接与本地音视频转为文稿</p>
     <div class="stats-row">
-      <div class="stat-item"><div class="stat-number">3</div><div class="stat-label">核心功能</div></div>
-      <div class="stat-item"><div class="stat-number">95%+</div><div class="stat-label">AI 准确率</div></div>
-      <div class="stat-item"><div class="stat-number">4</div><div class="stat-label">输出格式</div></div>
+      <div class="stat-item"><div class="stat-number">3</div><div class="stat-label">处理方式</div></div>
+      <div class="stat-item"><div class="stat-number">字幕优先</div><div class="stat-label">链接转文稿策略</div></div>
+      <div class="stat-item"><div class="stat-number">4</div><div class="stat-label">文稿格式 · MD / TXT / JSON / SRT</div></div>
     </div>
   </div>
 
+  <div class="runtime-status" id="runtime-status" role="status" aria-live="polite">
+    <span class="runtime-dot" aria-hidden="true"></span>
+    <span class="runtime-copy"><span id="runtime-status-text">正在检查本机能力…</span><span class="runtime-components" id="runtime-components-text">版本读取默认离线；不会自动升级。</span></span>
+    <button class="runtime-update-btn" id="runtime-update-btn" type="button" title="仅向 PyPI 官方接口查询 yt-dlp 最新稳定版，不会执行升级">联网检查最新版</button>
+  </div>
+
   <!-- Section Title -->
-  <h2 class="section-title">⚡ 核心功能</h2>
+  <h2 class="section-title">选择处理方式</h2>
 
   <!-- Feature Cards -->
   <div class="feature-cards">
 
-    <div class="card c-dl" onclick="openModal('download')">
+    <div class="card c-dl" data-open-modal="download" role="button" tabindex="0">
       <div class="card-icon">📥</div>
       <h3>视频下载</h3>
-      <p>输入抖音或B站视频链接<br>一键下载高清无水印视频</p>
-      <div class="card-tags"><span class="tag green">🎵 抖音</span><span class="tag blue">📺 B站</span><span class="tag">▶ YouTube</span></div>
+      <p>粘贴支持平台的视频链接<br>下载当前可获取的视频文件</p>
+      <div class="card-tags"><span class="tag green">抖音</span><span class="tag blue">B站</span><span class="tag">YouTube</span><span class="tag amber">小红书（实验）</span></div>
       <button class="btn btn-download">下载视频</button>
     </div>
 
-    <div class="card c-tr" onclick="openModal('transcribe')">
+    <div class="card c-tr" data-open-modal="transcribe" role="button" tabindex="0">
       <div class="card-icon">✨</div>
-      <h3>在线视频转录</h3>
-      <p>复制链接即可提取视频文案<br>AI 智能识别语音内容</p>
+      <h3>链接转文稿</h3>
+      <p>有平台字幕时优先使用<br>无字幕时再调用已配置的识别引擎</p>
       <div class="card-tags"><span class="tag purple">MD</span><span class="tag">SRT</span><span class="tag">TXT</span><span class="tag">JSON</span></div>
-      <button class="btn btn-transcribe">开始转录</button>
+      <button class="btn btn-transcribe">链接转文稿</button>
     </div>
 
-    <div class="card c-lo" onclick="openModal('local')">
+    <div class="card c-lo" data-open-modal="local" role="button" tabindex="0">
       <div class="card-icon">📤</div>
-      <h3>本地媒体转录</h3>
-      <p>上传本地音视频文件<br>AI 自动转录为文稿</p>
-      <div class="card-tags"><span class="tag green">MP3</span><span class="tag">WAV</span><span class="tag">MP4</span><span class="tag">MOV</span></div>
+      <h3>本地文件转文稿</h3>
+      <p>上传本地音频或视频<br>可选云端识别或仅本机识别</p>
+      <div class="card-tags"><span class="tag green">常见音视频</span><span class="tag">≤ 200 MB</span><span class="tag green">🔒 隐私模式需本地模型</span></div>
       <button class="btn btn-local">选择文件</button>
     </div>
 
@@ -277,19 +316,18 @@ body {
   <div class="history-section" id="history-section"></div>
 
   <!-- Footer -->
-  <div class="footer">Video2Doc v0.5.0 · MIT License · 永久免费</div>
+  <div class="footer">Video2Doc v0.6.0 · 本机运行 · 任务结果保存到本地</div>
 
 </div>
 
 <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
 <!-- MODAL: Download                                                    -->
 <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-<div class="modal-overlay" id="modal-download" onclick="if(event.target===this)closeModal()">
+<div class="modal-overlay" id="modal-download">
 <div class="modal-panel">
-  <div class="modal-header dl"><h3>📥 视频下载</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+  <div class="modal-header dl"><h3>📥 视频下载</h3><button class="modal-close" type="button" aria-label="关闭">×</button></div>
   <div class="modal-body">
-    <div class="input-row"><input class="form-control" id="dl-url" placeholder="粘贴抖音 / B站 / YouTube 视频链接…" autofocus><button class="btn-action btn-dl" id="dl-btn" onclick="startDownload()">下载</button></div>
-    <div class="opts-row"><label><input type="checkbox" id="dl-transcribe"> 下载后同时转录为文稿</label></div>
+    <div class="input-row"><input class="form-control" id="dl-url" placeholder="粘贴抖音 / B站 / YouTube / 小红书视频链接…" autofocus><button class="btn-action btn-dl" id="dl-btn" type="button">下载</button></div>
     <div class="progress-steps" id="dl-steps">
       <div class="progress-step"><div class="step-icon">🔗</div><div class="step-label">解析链接</div><div class="step-status">等待中</div></div>
       <div class="progress-step"><div class="step-icon">📥</div><div class="step-label">下载视频</div><div class="step-status">等待中</div></div>
@@ -304,26 +342,29 @@ body {
 <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
 <!-- MODAL: Transcribe                                                  -->
 <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-<div class="modal-overlay" id="modal-transcribe" onclick="if(event.target===this)closeModal()">
+<div class="modal-overlay" id="modal-transcribe">
 <div class="modal-panel">
-  <div class="modal-header tr"><h3>✨ 在线视频转录</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+  <div class="modal-header tr"><h3>✨ 链接转文稿</h3><button class="modal-close" type="button" aria-label="关闭">×</button></div>
   <div class="modal-body">
-    <div class="input-row"><input class="form-control" id="tr-url" placeholder="粘贴抖音 / B站 / YouTube 链接…" autofocus><button class="btn-action btn-tr" id="tr-btn" onclick="startTranscribe()">转录</button></div>
+    <div class="input-row"><input class="form-control" id="tr-url" placeholder="粘贴抖音 / B站 / YouTube / 小红书链接…" autofocus><button class="btn-action btn-tr" id="tr-btn" type="button">生成文稿</button></div>
     <div class="opts-row">
-      <select id="tr-engine" title="识别引擎"><option value="auto">默认（自动降级）</option><option value="doubao">豆包 2.0（首选）</option><option value="tele">TeleSpeechASR</option><option value="funasr">本地 FunASR</option><option value="whisper">本地 Whisper</option></select>
+      <select id="tr-engine" title="识别引擎"><option value="auto">自动（字幕优先，再尝试可用引擎）</option><option value="doubao">豆包 2.0</option><option value="tele">TeleSpeechASR</option><option value="funasr">本地 FunASR</option><option value="whisper">本地 Whisper</option></select>
       <select id="tr-format"><option value="md">MD 文稿</option><option value="srt">SRT 字幕</option><option value="txt">TXT 文本</option><option value="json">JSON</option><option value="all">全部格式</option></select>
-      <select id="tr-domain"><option value="">自动检测领域</option><option value="auto">汽车 🚗</option><option value="tech">科技 💻</option></select>
+    </div>
+    <div class="privacy-options">
+      <label class="privacy-option"><input type="checkbox" id="tr-enrichment" checked>尝试生成 AI 摘要、要点和标签</label>
+      <div class="privacy-note" id="tr-enrichment-note">需配置 SiliconFlow Key；开启后最多发送前 4000 字正文进行<strong>云端增强</strong>，失败不影响原始转录与格式导出。</div>
     </div>
     <div class="progress-steps" id="tr-steps">
       <div class="progress-step"><div class="step-icon">🔗</div><div class="step-label">解析链接</div><div class="step-status">等待中</div></div>
-      <div class="progress-step"><div class="step-icon">📥</div><div class="step-label">下载视频</div><div class="step-status">等待中</div></div>
-      <div class="progress-step"><div class="step-icon">🎵</div><div class="step-label">提取音频</div><div class="step-status">等待中</div></div>
-      <div class="progress-step"><div class="step-icon">🤖</div><div class="step-label">AI 识别</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">📥</div><div class="step-label">获取媒体</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">📝</div><div class="step-label">获取文字</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">📄</div><div class="step-label">生成文件</div><div class="step-status">等待中</div></div>
       <div class="progress-step"><div class="step-icon">✅</div><div class="step-label">完成</div><div class="step-status">等待中</div></div>
     </div>
     <div class="progress-section" id="tr-progress"><div class="progress-info" id="tr-status">准备中…</div><div class="progress-bar-outer"><div class="progress-bar-inner" id="tr-bar"></div></div></div>
     <div class="result-section" id="tr-result">
-      <div class="result-tabs"><button class="result-tab active" onclick="switchTab(this,'tr-txt')">📝 文稿</button><button class="result-tab" onclick="switchTab(this,'tr-srt')">🎬 SRT 字幕</button></div>
+      <div class="result-tabs"><button class="result-tab active" type="button" data-tab-target="tr-txt">📝 文稿</button><button class="result-tab" type="button" data-tab-target="tr-srt">🎬 SRT 字幕</button></div>
       <div class="result-content active" id="tr-txt"></div><div class="result-content" id="tr-srt"></div>
       <div class="result-actions" id="tr-result-actions"></div>
     </div>
@@ -334,32 +375,52 @@ body {
 <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
 <!-- MODAL: Local                                                       -->
 <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-<div class="modal-overlay" id="modal-local" onclick="if(event.target===this)closeModal()">
+<div class="modal-overlay" id="modal-local">
 <div class="modal-panel">
-  <div class="modal-header lo"><h3>📤 本地媒体转录</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+  <div class="modal-header lo"><h3>📤 本地文件转文稿</h3><button class="modal-close" type="button" aria-label="关闭">×</button></div>
   <div class="modal-body">
-    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('lo-file').click()"
-         ondragover="event.preventDefault();this.classList.add('drag-over')"
-         ondragleave="this.classList.remove('drag-over')"
-         ondrop="event.preventDefault();this.classList.remove('drag-over');handleDrop(event)">
+    <div class="upload-zone" id="upload-zone" role="button" tabindex="0">
       <div class="icon">📁</div><p>拖拽文件到此处或点击选择</p>
-      <small>MP3 · WAV · MP4 · MOV · MKV · WebM · M4A</small><small>最大 200MB</small>
+      <small>支持常见音频与视频格式</small><small>单文件最大 200 MB</small>
     </div>
-    <input type="file" id="lo-file" accept="audio/*,video/*" style="display:none" onchange="handleFileSelect(this)">
+    <input type="file" id="lo-file" accept="audio/*,video/*" style="display:none">
     <div class="opts-row">
-      <select id="lo-engine" title="识别引擎"><option value="auto">默认（自动降级）</option><option value="doubao">豆包 2.0（首选）</option><option value="tele">TeleSpeechASR</option><option value="funasr">本地 FunASR</option><option value="whisper">本地 Whisper</option></select>
+      <select id="lo-engine" title="识别引擎"><option value="auto">自动（按可用引擎依次尝试）</option><option value="doubao">豆包 2.0</option><option value="tele">TeleSpeechASR</option><option value="funasr">本地 FunASR</option><option value="whisper">本地 Whisper</option></select>
       <select id="lo-format"><option value="md">MD 文稿</option><option value="srt">SRT 字幕</option><option value="txt">TXT 文本</option><option value="json">JSON</option><option value="all">全部格式</option></select>
-      <button class="btn-action btn-lo btn-sm" id="lo-btn" onclick="startLocalTranscribe()" style="display:none">开始转录</button>
+      <button class="btn-action btn-lo btn-sm" id="lo-btn" type="button" style="display:none">开始转录</button>
+    </div>
+    <div class="privacy-options">
+      <div class="privacy-heading">数据处理方式</div>
+      <label class="privacy-option"><input type="checkbox" id="lo-local-only" aria-describedby="lo-local-note" disabled><span id="lo-local-only-label">🔒 隐私模式：正在检查本地引擎…</span></label>
+      <div class="privacy-note" id="lo-local-note" role="status" aria-live="polite">正在检查 FunASR / Whisper 是否可用。</div>
+      <label class="privacy-option"><input type="checkbox" id="lo-enrichment" aria-describedby="lo-enrichment-note" checked>云端内容增强（仅摘要、要点和标签）</label>
+      <div class="privacy-note" id="lo-enrichment-note">需配置 SiliconFlow Key；关闭本项不代表本地识别，标准模式仍可能调用云端 ASR。</div>
+      <details class="privacy-guide" id="lo-privacy-guide">
+        <summary>如何开启隐私模式？</summary>
+        <div class="privacy-guide-content">
+          <ol>
+            <li>按需安装至少一个本地引擎（两条命令任选其一）：
+              <code>python -m pip install funasr torch</code>
+              <code>python -m pip install openai-whisper</code>
+            </li>
+            <li>运行环境自检，确认 FunASR 或 Whisper 显示已就绪：<code>python scripts\check_setup.py</code></li>
+            <li>重启 Web 服务，重新打开本弹窗并勾选“隐私模式：仅本机识别”：<code>python webui.py</code></li>
+            <li>选择文件并开始转录；“自动”会按 FunASR → Whisper 尝试，本地引擎都失败时不会回退云端。</li>
+          </ol>
+          <p><strong>注意：</strong>只选择 FunASR/Whisper 或只关闭云端内容增强，都不等于开启隐私模式。</p>
+          <p class="privacy-boundary"><strong>数据边界：</strong>开启后，Video2Doc 不会把音视频或文稿发送给豆包、TeleSpeechASR 或 SiliconFlow；首次使用本地模型可能联网下载权重。上传文件和结果仍保存在本机 <code>output/&lt;任务 ID&gt;/</code>，目前需手动清理。</p>
+        </div>
+      </details>
     </div>
     <div class="progress-steps" id="lo-steps">
       <div class="progress-step"><div class="step-icon">📤</div><div class="step-label">上传文件</div><div class="step-status">等待中</div></div>
-      <div class="progress-step"><div class="step-icon">🎵</div><div class="step-label">提取音频</div><div class="step-status">等待中</div></div>
-      <div class="progress-step"><div class="step-icon">🤖</div><div class="step-label">AI 识别</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">📝</div><div class="step-label">获取文字</div><div class="step-status">等待中</div></div>
+      <div class="progress-step"><div class="step-icon">📄</div><div class="step-label">生成文件</div><div class="step-status">等待中</div></div>
       <div class="progress-step"><div class="step-icon">✅</div><div class="step-label">完成</div><div class="step-status">等待中</div></div>
     </div>
     <div class="progress-section" id="lo-progress"><div class="progress-info" id="lo-status">准备中…</div><div class="progress-bar-outer"><div class="progress-bar-inner" id="lo-bar"></div></div></div>
     <div class="result-section" id="lo-result">
-      <div class="result-tabs"><button class="result-tab active" onclick="switchTab(this,'lo-txt')">📝 文稿</button><button class="result-tab" onclick="switchTab(this,'lo-srt')">🎬 SRT 字幕</button></div>
+      <div class="result-tabs"><button class="result-tab active" type="button" data-tab-target="lo-txt">📝 文稿</button><button class="result-tab" type="button" data-tab-target="lo-srt">🎬 SRT 字幕</button></div>
       <div class="result-content active" id="lo-txt"></div><div class="result-content" id="lo-srt"></div>
       <div class="result-actions" id="lo-result-actions"></div>
     </div>
@@ -368,7 +429,8 @@ body {
 </div></div>
 
 <script>
-let activePoll=null, localFile=null;
+let activePoll=null, localFile=null, runtimeCapabilities=null;
+const engineLabels={doubao:'豆包 2.0',tele:'TeleSpeechASR',funasr:'本地 FunASR',whisper:'本地 Whisper'};
 
 // Signature: build hero waveform bars
 (function buildWave(){
@@ -383,36 +445,356 @@ let activePoll=null, localFile=null;
   }
 })();
 
-function openModal(t){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show'));const m=document.getElementById('modal-'+t);m.classList.add('show');['dl','tr','lo'].forEach(p=>resetModal(p));const i=document.getElementById({download:'dl-url',transcribe:'tr-url',local:'lo-file'}[t]);if(i&&i.type==='text'){i.value='';setTimeout(()=>i.focus(),100)}}
-function closeModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show'));if(activePoll)clearTimeout(activePoll)}
-function resetModal(p){document.querySelectorAll(`#${p}-steps .progress-step`).forEach(s=>s.classList.remove('active','completed'));document.getElementById(p+'-progress').classList.remove('show');document.getElementById(p+'-result').classList.remove('show');document.getElementById(p+'-error').classList.remove('show');const b=document.getElementById(p+'-btn');if(b)b.disabled=false;const bar=document.getElementById(p+'-bar');if(bar)bar.style.width='0'}
+function openModal(t){
+  document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show'));
+  const m=document.getElementById('modal-'+t);
+  if(!m)return;
+  m.classList.add('show');
+  ['dl','tr','lo'].forEach(p=>resetModal(p));
+  const i=document.getElementById({download:'dl-url',transcribe:'tr-url',local:'lo-file'}[t]);
+  if(i&&i.type==='text'){i.value='';setTimeout(()=>i.focus(),100)}
+}
+function closeModal(){
+  document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show'));
+  if(activePoll){clearTimeout(activePoll);activePoll=null}
+}
+function resetModal(p){
+  document.querySelectorAll(`#${p}-steps .progress-step`).forEach(s=>s.classList.remove('active','completed'));
+  document.getElementById(p+'-progress').classList.remove('show');
+  document.getElementById(p+'-result').classList.remove('show');
+  document.getElementById(p+'-error').classList.remove('show');
+  const b=document.getElementById(p+'-btn');if(b)b.disabled=false;
+  const bar=document.getElementById(p+'-bar');if(bar)bar.style.width='0';
+}
+
+function safeJobId(value){
+  const id=String(value||'');
+  return /^[A-Za-z0-9_-]{1,128}$/.test(id)?id:null;
+}
+function safeFileName(value){
+  const name=String(value||'');
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/.test(name)?name:null;
+}
+function createDownloadLink(jobId,file,themeClass){
+  const id=safeJobId(jobId);
+  const storedName=safeFileName(file&&file.file);
+  if(!id||!storedName)return null;
+  const link=document.createElement('a');
+  link.href=`/api/download/${id}/${storedName}`;
+  link.download='';
+  link.className=`btn-action ${themeClass} btn-sm`;
+  link.textContent='📥 '+String((file&&file.name)||storedName);
+  return link;
+}
+function createEngineBadge(result){
+  if(!result||!result.engine_used)return null;
+  const labels={doubao:'豆包2.0',tele:'TeleSpeechASR',funasr:'本地FunASR',whisper:'本地Whisper',subtitle:'平台字幕'};
+  const badge=document.createElement('span');
+  badge.style.cssText='display:inline-block;padding:4px 10px;background:#e0e7ff;color:#3730a3;border-radius:6px;font-size:12px;margin-right:8px;vertical-align:middle;';
+  const name=labels[result.engine_used]||String(result.engine_used);
+  const note=result.engine_note?(' · '+String(result.engine_note)):'';
+  badge.textContent=`🤖 ${name}${note}`;
+  return badge;
+}
+function renderDownloadActions(container,result,themeClass){
+  container.replaceChildren();
+  const files=Array.isArray(result&&result.files)?result.files:[];
+  files.forEach(file=>{const link=createDownloadLink(result.id,file,themeClass);if(link)container.appendChild(link)});
+}
+function renderTranscriptActions(container,result,themeClass,text){
+  container.replaceChildren();
+  const badge=createEngineBadge(result);if(badge)container.appendChild(badge);
+  const files=Array.isArray(result&&result.files)?result.files:[];
+  files.forEach(file=>{const link=createDownloadLink(result.id,file,themeClass);if(link)container.appendChild(link)});
+  const copy=document.createElement('button');
+  copy.type='button';
+  copy.className=`btn-action btn-sm ${themeClass}`;
+  copy.textContent='📋 复制';
+  copy.addEventListener('click',()=>copyText(text));
+  container.appendChild(copy);
+}
+async function fetchContent(jobId,kind){
+  const id=safeJobId(jobId);
+  if(!id||!['text','srt'].includes(kind))return'';
+  try{
+    const response=await fetch(`/api/content/${id}/${kind}`);
+    const data=await response.json();
+    return typeof data.content==='string'?data.content:'';
+  }catch(e){return''}
+}
+async function showTranscriptResult(prefix,result,themeClass){
+  document.getElementById(prefix+'-progress').classList.remove('show');
+  document.getElementById(prefix+'-result').classList.add('show');
+  const [text,srt]=await Promise.all([fetchContent(result.id,'text'),fetchContent(result.id,'srt')]);
+  document.getElementById(prefix+'-txt').textContent=text;
+  document.getElementById(prefix+'-srt').textContent=srt;
+  renderTranscriptActions(document.getElementById(prefix+'-result-actions'),result,themeClass,text);
+}
 
 // Download
-async function startDownload(){const u=document.getElementById('dl-url').value.trim();if(!u)return alert('请粘贴视频链接');document.getElementById('dl-btn').disabled=true;document.getElementById('dl-progress').classList.add('show');updateSteps('dl',0);const t=document.getElementById('dl-transcribe').checked;activeJob('dl','download-video',{url:u,transcribe:t},r=>{document.getElementById('dl-progress').classList.remove('show');document.getElementById('dl-result').classList.add('show');const f=r.files||[];document.getElementById('dl-result-text').textContent=f.length?`✅ 已保存: ${f[0].name} (${formatSize(f[0].size)})`:'✅ 下载完成';document.getElementById('dl-result-actions').innerHTML=f.map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-dl btn-sm">📥 ${x.name}</a>`).join('');loadHistory()})}
+async function startDownload(){
+  const u=document.getElementById('dl-url').value.trim();if(!u)return alert('请粘贴视频链接');
+  document.getElementById('dl-btn').disabled=true;
+  document.getElementById('dl-progress').classList.add('show');
+  updateSteps('dl',0);
+  activeJob('dl','download-video',{url:u},result=>{
+    document.getElementById('dl-progress').classList.remove('show');
+    document.getElementById('dl-result').classList.add('show');
+    const files=Array.isArray(result.files)?result.files:[];
+    document.getElementById('dl-result-text').textContent=files.length?`✅ 已保存: ${String(files[0].name||'文件')} (${formatSize(files[0].size)})`:'✅ 下载完成';
+    renderDownloadActions(document.getElementById('dl-result-actions'),result,'btn-dl');
+    loadHistory();
+  });
+}
 
 // Transcribe
-async function startTranscribe(){const u=document.getElementById('tr-url').value.trim();if(!u)return alert('请粘贴视频链接');document.getElementById('tr-btn').disabled=true;document.getElementById('tr-progress').classList.add('show');updateSteps('tr',0);const f=document.getElementById('tr-format').value,d=document.getElementById('tr-domain').value,e=document.getElementById('tr-engine').value;activeJob('tr','transcribe-online',{url:u,formats:f,domain:d,engine:e},async r=>{document.getElementById('tr-progress').classList.remove('show');document.getElementById('tr-result').classList.add('show');try{const[t,s]=await Promise.all([fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),fetch('/api/content/'+r.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')]);document.getElementById('tr-txt').textContent=t;document.getElementById('tr-srt').textContent=s;document.getElementById('tr-result-actions').innerHTML=engineBadge(r)+(r.files||[]).map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-tr btn-sm">📥 ${x.name}</a>`).join('')+`<button class="btn-action btn-sm btn-tr" onclick="copyText('${escapeHtml(t)}')">📋 复制</button>`}catch(e){}loadHistory()})}
+async function startTranscribe(){
+  const u=document.getElementById('tr-url').value.trim();if(!u)return alert('请粘贴视频链接');
+  document.getElementById('tr-btn').disabled=true;
+  document.getElementById('tr-progress').classList.add('show');
+  updateSteps('tr',0);
+  const formats=document.getElementById('tr-format').value;
+  const engine=document.getElementById('tr-engine').value;
+  const enrichment=document.getElementById('tr-enrichment');
+  const allowEnrichment=!enrichment.disabled&&enrichment.checked;
+  activeJob('tr','transcribe-online',{url:u,formats,engine,allow_enrichment:allowEnrichment},async result=>{
+    await showTranscriptResult('tr',result,'btn-tr');
+    loadHistory();
+  });
+}
 
 // Local
-function handleDrop(e){const f=e.dataTransfer.files[0];if(f)selectFile(f)}
-function handleFileSelect(i){const f=i.files[0];if(f)selectFile(f)}
-function selectFile(f){if(f.size>200*1024*1024)return alert('文件超过 200MB 限制');localFile=f;const z=document.getElementById('upload-zone');z.classList.add('file-selected');z.innerHTML=`<div class="file-info"><span class="name">📄 ${f.name}</span><span class="size">${formatSize(f.size)}</span><button class="btn-action btn-sm btn-local" onclick="clearFile()">移除</button></div>`;document.getElementById('lo-btn').style.display='inline-block'}
-function clearFile(){localFile=null;document.getElementById('lo-btn').style.display='none';const z=document.getElementById('upload-zone');z.classList.remove('file-selected');z.innerHTML='<div class="icon">📁</div><p>拖拽文件到此处或点击选择</p><small>MP3 · WAV · MP4 · MOV · MKV · WebM · M4A</small><small>最大 200MB</small>'}
-async function startLocalTranscribe(){if(!localFile)return alert('请先选择文件');document.getElementById('lo-btn').disabled=true;document.getElementById('lo-progress').classList.add('show');updateSteps('lo',1);const fd=new FormData();fd.append('file',localFile);fd.append('formats',document.getElementById('lo-format').value);fd.append('engine',document.getElementById('lo-engine').value);try{const r=await fetch('/api/transcribe-local',{method:'POST',body:fd});const d=await r.json();if(d.error){showError('lo',d.error);return}activeJob('lo',null,null,async r=>{document.getElementById('lo-progress').classList.remove('show');document.getElementById('lo-result').classList.add('show');try{const[t,s]=await Promise.all([fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'').catch(()=>''),fetch('/api/content/'+r.id+'/srt').then(r=>r.json()).then(d=>d.content||'').catch(()=>'')]);document.getElementById('lo-txt').textContent=t;document.getElementById('lo-srt').textContent=s;document.getElementById('lo-result-actions').innerHTML=engineBadge(r)+(r.files||[]).map(x=>`<a href="/api/download/${r.id}/${x.file}" download class="btn-action btn-lo btn-sm">📥 ${x.name}</a>`).join('')+`<button class="btn-action btn-sm btn-lo" onclick="copyText('${escapeHtml(t)}')">📋 复制</button>`}catch(e){}loadHistory()},d.job_id)}catch(e){showError('lo','连接失败')}}
+function handleDrop(e){const f=e.dataTransfer&&e.dataTransfer.files[0];if(f)selectFile(f)}
+function handleFileSelect(i){const f=i.files&&i.files[0];if(f)selectFile(f)}
+function renderUploadPrompt(){
+  const zone=document.getElementById('upload-zone');
+  zone.replaceChildren();
+  const icon=document.createElement('div');icon.className='icon';icon.textContent='📁';
+  const prompt=document.createElement('p');prompt.textContent='拖拽文件到此处或点击选择';
+  const formats=document.createElement('small');formats.textContent='支持常见音频与视频格式';
+  const limit=document.createElement('small');limit.textContent='单文件最大 200 MB';
+  zone.append(icon,prompt,formats,limit);
+}
+function selectFile(file){
+  if(file.size>200*1024*1024)return alert('文件超过 200MB 限制');
+  localFile=file;
+  const zone=document.getElementById('upload-zone');
+  zone.classList.add('file-selected');
+  zone.replaceChildren();
+  const info=document.createElement('div');info.className='file-info';
+  const name=document.createElement('span');name.className='name';name.textContent='📄 '+String(file.name||'(未命名文件)');
+  const size=document.createElement('span');size.className='size';size.textContent=formatSize(file.size);
+  const remove=document.createElement('button');remove.type='button';remove.className='btn-action btn-sm btn-local';remove.textContent='移除';
+  remove.addEventListener('click',event=>{event.stopPropagation();clearFile()});
+  info.append(name,size,remove);zone.appendChild(info);
+  document.getElementById('lo-btn').style.display='inline-block';
+}
+function clearFile(){
+  localFile=null;
+  const input=document.getElementById('lo-file');input.value='';
+  document.getElementById('lo-btn').style.display='none';
+  const zone=document.getElementById('upload-zone');zone.classList.remove('file-selected');
+  renderUploadPrompt();
+}
+function engineConfigured(name){
+  return Boolean(runtimeCapabilities&&runtimeCapabilities.engines&&runtimeCapabilities.engines[name]);
+}
+function syncEngineSelect(selectId,localOnly=false){
+  const select=document.getElementById(selectId);if(!select)return;
+  Array.from(select.options).forEach(option=>{
+    if(option.value==='auto'){
+      option.disabled=false;
+      option.textContent=selectId==='tr-engine'
+        ?'自动（字幕优先，再尝试可用引擎）'
+        :(localOnly?'自动（FunASR → Whisper）':'自动（按可用引擎依次尝试）');
+      return;
+    }
+    const unavailable=runtimeCapabilities!==null&&!engineConfigured(option.value);
+    const cloudBlocked=localOnly&&['doubao','tele'].includes(option.value);
+    option.disabled=unavailable||cloudBlocked;
+    const reason=['doubao','tele'].includes(option.value)?'未配置':'未安装';
+    const configuredLabel=['doubao','tele'].includes(option.value)?'已配置，未验证':'已安装';
+    option.textContent=engineLabels[option.value]+(runtimeCapabilities===null?'':`（${unavailable?reason:configuredLabel}）`);
+  });
+  const selected=select.options[select.selectedIndex];
+  if(selected&&selected.disabled)select.value='auto';
+}
+function syncLocalPrivacyOptions(){
+  let localOnly=document.getElementById('lo-local-only').checked;
+  const localToggle=document.getElementById('lo-local-only');
+  const enrichment=document.getElementById('lo-enrichment');
+  const capabilitiesKnown=runtimeCapabilities!==null;
+  const localReady=capabilitiesKnown&&(engineConfigured('funasr')||engineConfigured('whisper'));
+  if(!localReady&&localToggle.checked)localToggle.checked=false;
+  localOnly=localToggle.checked;
+  localToggle.disabled=!localReady;
+  document.getElementById('lo-local-only-label').textContent=!capabilitiesKnown
+    ?'🔒 隐私模式：正在检查本地引擎…'
+    :(localReady?'🔒 隐私模式：仅本机识别':'🔒 隐私模式：仅本机识别（需安装 FunASR 或 Whisper）');
+  syncEngineSelect('lo-engine',localToggle.checked);
+  if(localOnly)enrichment.checked=false;
+  const enrichmentConfigured=runtimeCapabilities===null||Boolean(runtimeCapabilities.enrichment_configured);
+  const formatSupports=['md','json','all'].includes(document.getElementById('lo-format').value);
+  if(localToggle.checked||!enrichmentConfigured||!formatSupports)enrichment.checked=false;
+  enrichment.disabled=localToggle.checked||!enrichmentConfigured||!formatSupports;
+  const enrichmentNote=document.getElementById('lo-enrichment-note');
+  enrichmentNote.textContent=localOnly
+    ?'隐私模式已强制关闭云端内容增强。'
+    :(!formatSupports
+      ?'TXT/SRT 不包含摘要；请选择 MD、JSON 或全部格式后再开启。关闭本项不代表本地识别。'
+      :(!enrichmentConfigured?'尚未配置 SiliconFlow Key；关闭本项不代表本地识别，标准模式仍可能调用云端 ASR。':'Key 已配置但未联网验证；开启后最多发送前 4000 字正文。关闭本项不代表本地识别。'));
+  document.getElementById('lo-local-note').textContent=localOnly
+    ?'已启用：音视频和文稿不会发送给豆包、TeleSpeechASR 或 SiliconFlow；“自动”仅按 FunASR → Whisper 尝试。'
+    :(!capabilitiesKnown?'正在检查 FunASR / Whisper 是否可用。':(!localReady?'当前不可开启：未检测到 FunASR 或 Whisper。展开下方查看安装步骤；标准模式仍可能使用云端识别。':'当前为标准模式：可能使用已配置的云端识别引擎；选择本地引擎本身不等于开启隐私模式。'));
+}
+function syncOnlineEnrichmentOption(){
+  const enrichment=document.getElementById('tr-enrichment');
+  const enrichmentConfigured=runtimeCapabilities===null||Boolean(runtimeCapabilities.enrichment_configured);
+  const formatSupports=['md','json','all'].includes(document.getElementById('tr-format').value);
+  if(!enrichmentConfigured||!formatSupports)enrichment.checked=false;
+  enrichment.disabled=!enrichmentConfigured||!formatSupports;
+  document.getElementById('tr-enrichment-note').textContent=!formatSupports
+    ?'TXT/SRT 不包含摘要；请选择 MD、JSON 或全部格式后再开启。'
+    :(!enrichmentConfigured?'尚未配置 SiliconFlow Key；关闭不影响原始转录与格式导出。':'Key 已配置但未联网验证；最多发送前 4000 字正文，失败不影响原始转录。');
+}
+function renderComponentVersions(data,checkedOnline=false){
+  const output=document.getElementById('runtime-components-text');
+  const components=data&&data.components&&typeof data.components==='object'?data.components:{};
+  const python=components.python||{};
+  const ffmpeg=components.ffmpeg||{};
+  const ytdlp=components.yt_dlp||{};
+  const jsRuntime=components.javascript_runtime||{};
+  const parts=[];
+  if(python.version)parts.push(`Python ${python.version}`);
+  if(ffmpeg.version)parts.push(`FFmpeg ${ffmpeg.version}`);
+  if(ytdlp.installed){
+    let yt=`yt-dlp${ytdlp.version?' '+ytdlp.version:''}`;
+    if(ytdlp.version_status==='update_required'||ytdlp.meets_minimum===false){
+      yt+=`（低于最低要求${ytdlp.minimum_version?' '+ytdlp.minimum_version:''}，请手动更新）`;
+    }else if(!checkedOnline&&ytdlp.minimum_version){
+      yt+=`（最低要求 ${ytdlp.minimum_version}）`;
+    }
+    if(checkedOnline){
+      if(ytdlp.update_check_failed){
+        yt+='（官方最新版本检查失败）';
+      }else if(ytdlp.latest_version&&ytdlp.update_available===true){
+        yt+=`（官方最新 ${ytdlp.latest_version}，可手动更新）`;
+      }else if(ytdlp.latest_version){
+        yt+=`（官方最新 ${ytdlp.latest_version}）`;
+      }
+    }
+    parts.push(yt);
+  }else{
+    parts.push(`yt-dlp 未安装${ytdlp.minimum_version?'（最低要求 '+ytdlp.minimum_version+'）':''}`);
+  }
+  if(jsRuntime.installed){
+    parts.push(`${jsRuntime.name||'JavaScript runtime'}${jsRuntime.version?' '+jsRuntime.version:''}`);
+  }else{
+    parts.push('未检测到 JavaScript runtime（部分 YouTube 视频可能受限）');
+  }
+  parts.push(checkedOnline?'联网检查只读取官方版本信息，不会自动升级':'本机版本为离线读取；点击右侧按钮才会联网');
+  output.textContent=parts.join(' · ');
+}
+async function loadCapabilities(checkUpdates=false){
+  const status=document.getElementById('runtime-status');
+  const statusText=document.getElementById('runtime-status-text');
+  const updateButton=document.getElementById('runtime-update-btn');
+  if(checkUpdates){updateButton.disabled=true;updateButton.textContent='正在检查…'}
+  try{
+    const response=await fetch(checkUpdates?'/api/component-updates':'/api/capabilities');
+    if(!response.ok)throw new Error('capabilities unavailable');
+    const data=await response.json();
+    if(!data||typeof data!=='object'||!data.engines)throw new Error('invalid capabilities');
+    runtimeCapabilities=data;
+    renderComponentVersions(data,checkUpdates);
+    syncEngineSelect('tr-engine');
+    syncOnlineEnrichmentOption();
+    syncLocalPrivacyOptions();
+
+    const names=Object.keys(engineLabels).filter(name=>engineConfigured(name)).map(name=>engineLabels[name]);
+    status.classList.remove('ready','warn');
+    if(data.download_tools_ready&&data.transcription_configured){
+      status.classList.add('ready');
+      statusText.textContent=`下载工具已就绪 · 识别环境已配置但未实际验证：${names.join('、')}`;
+    }else if(data.download_tools_ready){
+      status.classList.add('warn');
+      statusText.textContent='下载工具已就绪 · 语音识别尚未配置；带平台字幕的链接仍可生成文稿，无字幕时请配置豆包或 SiliconFlow Key。';
+    }else if(data.transcription_configured){
+      status.classList.add('warn');
+      statusText.textContent=`识别环境已配置但未实际验证（${names.join('、')}）· 视频下载工具尚未完整安装。`;
+    }else{
+      status.classList.add('warn');
+      statusText.textContent='下载工具尚未完整安装，且语音识别尚未配置；请先完成环境配置。';
+    }
+  }catch(error){
+    if(checkUpdates&&runtimeCapabilities){
+      renderComponentVersions(runtimeCapabilities,false);
+      document.getElementById('runtime-components-text').textContent+=' · 联网检查失败，请稍后重试。';
+      return;
+    }
+    status.classList.add('warn');
+    statusText.textContent='无法读取本机能力状态；请运行 python scripts/check_setup.py 检查环境。';
+  }finally{
+    updateButton.disabled=false;
+    updateButton.textContent=checkUpdates?'重新检查最新版':'联网检查最新版';
+  }
+}
+async function startLocalTranscribe(){
+  if(!localFile)return alert('请先选择文件');
+  if(runtimeCapabilities&&!runtimeCapabilities.transcription_configured)return alert('当前没有可用的识别引擎：请配置豆包或 SiliconFlow API Key，或安装 FunASR / Whisper。');
+  document.getElementById('lo-btn').disabled=true;
+  document.getElementById('lo-progress').classList.add('show');
+  updateSteps('lo',1);
+  const localOnly=document.getElementById('lo-local-only').checked;
+  const enrichment=document.getElementById('lo-enrichment');
+  const allowEnrichment=!localOnly&&!enrichment.disabled&&enrichment.checked;
+  const fd=new FormData();
+  fd.append('file',localFile);
+  fd.append('formats',document.getElementById('lo-format').value);
+  fd.append('engine',document.getElementById('lo-engine').value);
+  fd.append('local_only',String(localOnly));
+  fd.append('allow_enrichment',String(allowEnrichment));
+  try{
+    const response=await fetch('/api/transcribe-local',{method:'POST',body:fd});
+    const data=await response.json();
+    if(data.error){showError('lo',data.error);return}
+    activeJob('lo',null,null,async result=>{
+      await showTranscriptResult('lo',result,'btn-lo');
+      loadHistory();
+    },data.job_id);
+  }catch(e){showError('lo','连接失败')}
+}
 
 // Shared polling
-async function activeJob(p,ep,body,onDone,oid){
-  let jid=oid;
-  if(!jid){try{const r=await fetch('/api/'+(ep||'process'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const d=await r.json();if(d.error){showError(p,d.error);return}jid=d.job_id}catch(e){showError(p,'连接失败');return}}
-  const poll=async()=>{try{const r=await fetch('/api/status/'+jid);const j=await r.json();updateSteps(p,j.status);setProgress(p,j.progress,j.status);if(j.status==='done'){onDone(j);activePoll=null;return}if(j.status==='error'){showError(p,j.error||'未知错误');return}activePoll=setTimeout(poll,1000)}catch(e){activePoll=setTimeout(poll,2000)}};
+async function activeJob(prefix,endpoint,body,onDone,originalId){
+  let jobId=originalId;
+  if(!jobId){
+    try{
+      const response=await fetch('/api/'+(endpoint||'process'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+      const data=await response.json();
+      if(data.error){showError(prefix,data.error);return}
+      jobId=data.job_id;
+    }catch(e){showError(prefix,'连接失败');return}
+  }
+  const safeId=safeJobId(jobId);
+  if(!safeId){showError(prefix,'服务端返回了无效任务编号');return}
+  const poll=async()=>{
+    try{
+      const response=await fetch('/api/status/'+safeId);
+      const job=await response.json();
+      updateSteps(prefix,job.status);setProgress(prefix,job.progress,job.status);
+      if(job.status==='done'){await onDone(job);activePoll=null;return}
+      if(job.status==='error'){showError(prefix,job.error||'未知错误');return}
+      activePoll=setTimeout(poll,1000);
+    }catch(e){activePoll=setTimeout(poll,2000)}
+  };
   poll();
 }
-const stepMap={dl:['解析链接','下载视频','完成'],tr:['解析链接','下载视频','提取音频','AI识别','完成'],lo:['上传文件','提取音频','AI识别','完成']};
 // 后端状态 -> 该弹窗应高亮的步骤序号（此前置步骤自动标记完成）
 const statusStep={
   dl:{resolving:0, downloading:1},
-  tr:{resolving:0, downloading:1, extracting:2, transcribing:3, exporting:4},
-  lo:{extracting:1, transcribing:2, exporting:3}   // 上传文件(0) 任务开始时即视为完成
+  tr:{resolving:0, downloading:1, extracting:2, transcribing:2, exporting:3},
+  lo:{extracting:1, transcribing:1, exporting:2}   // 上传文件(0) 任务开始时即视为完成
 };
 function updateSteps(p,s){
   if(s==='done'){document.querySelectorAll(`#${p}-steps .progress-step`).forEach(el=>{el.classList.remove('active');el.classList.add('completed')});return;}
@@ -427,17 +809,97 @@ function showError(p,msg){const b=document.getElementById(p+'-btn');if(b)b.disab
 function switchTab(btn,cid){btn.parentElement.querySelectorAll('.result-tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');btn.parentElement.parentElement.querySelectorAll('.result-content').forEach(c=>c.classList.remove('active'));document.getElementById(cid).classList.add('active')}
 
 // Utils
-function formatSize(b){return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'}
-function engineBadge(r){if(!r.engine_used)return'';const labels={doubao:'豆包2.0',tele:'TeleSpeechASR',funasr:'本地FunASR',whisper:'本地Whisper'};const name=labels[r.engine_used]||r.engine_used;const note=r.engine_note?(' · '+r.engine_note):'';return`<span style="display:inline-block;padding:4px 10px;background:#e0e7ff;color:#3730a3;border-radius:6px;font-size:12px;margin-right:8px;vertical-align:middle;">🤖 ${name}${note}</span>`}
-function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function formatSize(value){
+  const bytes=Number(value);
+  if(!Number.isFinite(bytes)||bytes<0)return'大小未知';
+  return bytes<1024?bytes+' B':bytes<1048576?(bytes/1024).toFixed(1)+' KB':(bytes/1048576).toFixed(1)+' MB';
+}
 async function copyText(t){try{await navigator.clipboard.writeText(t);alert('已复制')}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('已复制')}}
 
 // History
-async function loadHistory(){try{const r=await fetch('/api/history');const d=await r.json();const types={download:'📥',transcribe_online:'✨',transcribe_local:'📤'};document.getElementById('history-section').innerHTML=d.length?'<h4>最近处理</h4><div class="history-list">'+d.slice(0,8).map(j=>`<div class="history-item" onclick="viewHistory('${j.id}','${j.type}')"><span class="hist-icon">${types[j.type]||'📄'}</span><span class="hist-title">${j.title||j.url||'(无标题)'}</span><span class="hist-time">${j.duration||''}</span></div>`).join('')+'</div>':''}catch(e){}}
-async function viewHistory(jid,type){const mt=type==='download'?'download':type==='transcribe_local'?'local':'transcribe';openModal(mt);try{const r=await fetch('/api/status/'+jid);const j=await r.json();if(j.status==='done'){const h=mt==='download'?r=>{document.getElementById('dl-result').classList.add('show');document.getElementById('dl-result-text').textContent='✅ 已下载'}:mt==='local'?async r=>{document.getElementById('lo-result').classList.add('show');try{const t=await fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'');document.getElementById('lo-txt').textContent=t}catch(e){}}:async r=>{document.getElementById('tr-result').classList.add('show');try{const t=await fetch('/api/content/'+r.id+'/text').then(r=>r.json()).then(d=>d.content||'');document.getElementById('tr-txt').textContent=t}catch(e){}};h(j)}else{showError({download:'dl',transcribe:'tr',local:'lo'}[mt],'该任务未完成')}}catch(e){}}
+async function loadHistory(){
+  const section=document.getElementById('history-section');
+  try{
+    const response=await fetch('/api/history');
+    const data=await response.json();
+    const jobs=Array.isArray(data)?data:[];
+    const icons={download:'📥',transcribe_online:'✨',transcribe_local:'📤'};
+    section.replaceChildren();
+    if(!jobs.length)return;
+    const heading=document.createElement('h4');heading.textContent='最近处理';
+    const list=document.createElement('div');list.className='history-list';
+    jobs.slice(0,8).forEach(job=>{
+      const item=document.createElement('button');item.type='button';item.className='history-item';
+      const icon=document.createElement('span');icon.className='hist-icon';icon.textContent=icons[job.type]||'📄';
+      const title=document.createElement('span');title.className='hist-title';title.textContent=String(job.title||job.url||'(无标题)');
+      const time=document.createElement('span');time.className='hist-time';time.textContent=String(job.duration||'');
+      item.append(icon,title,time);
+      item.addEventListener('click',()=>viewHistory(job.id,job.type));
+      list.appendChild(item);
+    });
+    section.append(heading,list);
+  }catch(e){section.replaceChildren()}
+}
+async function viewHistory(jobId,type){
+  const id=safeJobId(jobId);
+  const modalByType={download:'download',transcribe_local:'local',transcribe_online:'transcribe'};
+  const modalType=modalByType[type];
+  if(!id||!modalType)return;
+  const prefix={download:'dl',local:'lo',transcribe:'tr'}[modalType];
+  openModal(modalType);
+  try{
+    const response=await fetch('/api/status/'+id);
+    const job=await response.json();
+    if(job.status!=='done'){showError(prefix,'该任务未完成');return}
+    if(modalType==='download'){
+      document.getElementById('dl-result').classList.add('show');
+      document.getElementById('dl-result-text').textContent='✅ 已下载';
+      renderDownloadActions(document.getElementById('dl-result-actions'),job,'btn-dl');
+    }else{
+      await showTranscriptResult(prefix,job,modalType==='local'?'btn-lo':'btn-tr');
+    }
+  }catch(e){showError(prefix,'无法读取历史任务')}
+}
 
+function bindStaticEvents(){
+  document.querySelectorAll('[data-open-modal]').forEach(card=>{
+    const open=()=>openModal(card.dataset.openModal);
+    card.addEventListener('click',open);
+    card.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open()}});
+  });
+  document.querySelectorAll('.modal-overlay').forEach(overlay=>overlay.addEventListener('click',event=>{if(event.target===overlay)closeModal()}));
+  document.querySelectorAll('.modal-close').forEach(button=>button.addEventListener('click',closeModal));
+  document.getElementById('dl-btn').addEventListener('click',startDownload);
+  document.getElementById('tr-btn').addEventListener('click',startTranscribe);
+  document.getElementById('lo-btn').addEventListener('click',startLocalTranscribe);
+  document.getElementById('runtime-update-btn').addEventListener('click',()=>loadCapabilities(true));
+  document.querySelectorAll('[data-tab-target]').forEach(button=>button.addEventListener('click',()=>switchTab(button,button.dataset.tabTarget)));
+
+  const uploadZone=document.getElementById('upload-zone');
+  const fileInput=document.getElementById('lo-file');
+  uploadZone.addEventListener('click',()=>fileInput.click());
+  uploadZone.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();fileInput.click()}});
+  uploadZone.addEventListener('dragover',event=>{event.preventDefault();uploadZone.classList.add('drag-over')});
+  uploadZone.addEventListener('dragleave',()=>uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop',event=>{event.preventDefault();uploadZone.classList.remove('drag-over');handleDrop(event)});
+  fileInput.addEventListener('change',()=>handleFileSelect(fileInput));
+  document.getElementById('lo-local-only').addEventListener('change',syncLocalPrivacyOptions);
+  document.getElementById('tr-format').addEventListener('change',syncOnlineEnrichmentOption);
+  document.getElementById('lo-format').addEventListener('change',syncLocalPrivacyOptions);
+
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){closeModal();return}
+    if(event.key!=='Enter')return;
+    if(event.target===document.getElementById('dl-url'))startDownload();
+    else if(event.target===document.getElementById('tr-url'))startTranscribe();
+  });
+}
+
+bindStaticEvents();
+syncOnlineEnrichmentOption();
+syncLocalPrivacyOptions();
+loadCapabilities();
 loadHistory();
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if(e.key==='Enter'){if(document.getElementById('modal-download').classList.contains('show'))startDownload();else if(document.getElementById('modal-transcribe').classList.contains('show'))startTranscribe()}});
 </script>
 </body>
 </html>

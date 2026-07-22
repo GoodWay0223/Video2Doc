@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video2Doc Web UI v0.5.0 — 本地可视化前端
+Video2Doc Web UI — 本地可视化前端
 Run: python3 webui.py
 Open: http://localhost:8765
 
@@ -9,16 +9,34 @@ Three core functions:
   2. Online transcription — paste link, AI transcribes to text
   3. Local media transcription — upload file, AI transcribes to text
 """
-import http.server, sys, argparse
+import argparse
+import http.server
+import sys
+from webui import __version__
 from webui.server import Handler
 
 PORT = 8765
+HOST = "127.0.0.1"
+
+
+def configure_console_encoding():
+    """Keep Chinese/emoji status output safe in redirected Windows terminals."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (LookupError, OSError):
+                pass
 
 def main():
+    configure_console_encoding()
     parser = argparse.ArgumentParser(description='Video2Doc Web UI')
     parser.add_argument('--no-check', action='store_true', help='跳过启动环境检查')
     parser.add_argument('--check-only', action='store_true', help='仅运行环境检查，不启动服务')
     parser.add_argument('--port', type=int, default=PORT, help=f'指定端口 (默认: {PORT})')
+    parser.add_argument('--host', default=HOST,
+                        help=f'监听地址 (默认: {HOST}；局域网共享时可显式指定 0.0.0.0)')
     args = parser.parse_args()
 
     # Startup environment check
@@ -37,12 +55,13 @@ def main():
         return
 
     port = args.port
-    server = http.server.HTTPServer(('0.0.0.0', port), Handler)
+    host = args.host
+    server = http.server.HTTPServer((host, port), Handler)
     print(f"""
 ╔══════════════════════════════════════════╗
-║   🎬 Video2Doc 工坊 v0.5.0               ║
+║   🎬 Video2Doc 工坊 v{__version__:<20}║
 ║                                          ║
-║   打开: http://localhost:{port}              ║
+║   打开: http://{host}:{port}                  ║
 ║   按 Ctrl+C 停止                           ║
 ╚══════════════════════════════════════════╝
     """)
