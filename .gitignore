@@ -1,7 +1,11 @@
 .DS_Store
 *.pyc
 __pycache__/
+.pytest_cache/
+.venv/
+.coverage
 .playwright-cli/
+dist/
 
 # Sensitive files — NEVER commit
 cookies.txt

@@ -4,6 +4,10 @@
 
 set -uo pipefail  # removed -e to prevent premature exit on validation failure
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python_cmd.sh"
+PYTHON_BIN="$(video2doc_find_python)" || exit 1
+
 VIDEO_FILE="${1:?Usage: $0 <VIDEO_FILE> <INFO_JSON> <OUTPUT_MP3>}"
 INFO_JSON="${2:?Usage: $0 <VIDEO_FILE> <INFO_JSON> <OUTPUT_MP3>}"
 OUTPUT_MP3="${3:?Usage: $0 <VIDEO_FILE> <INFO_JSON> <OUTPUT_MP3>}"
@@ -30,11 +34,11 @@ echo "Audio duration (ffprobe): ${AUDIO_DUR}s"
 # Step 3: Get metadata duration from info.json
 VALID=0
 if [[ -f "$INFO_JSON" ]]; then
-    META_DUR=$(python3 -c "import json; print(json.load(open('$INFO_JSON')).get('duration', 0))" 2>/dev/null || echo "0")
+    META_DUR=$("$PYTHON_BIN" -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("duration", 0))' "$INFO_JSON" 2>/dev/null || echo "0")
     echo "Metadata duration: ${META_DUR}s"
 
     # Step 4: Compare — wrap in conditional so exit doesn't kill the script
-    python3 -c "
+    "$PYTHON_BIN" -c "
 a = float($AUDIO_DUR)
 m = float($META_DUR)
 if m == 0:

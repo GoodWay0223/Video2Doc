@@ -1,56 +1,33 @@
 """Pipeline: download, extract audio, transcribe, export."""
-import json, os, re, subprocess, shutil, base64, uuid, time
+import json, os, re, subprocess, base64, uuid, time
 from pathlib import Path
 
 from .job_manager import Job, JobType, OUTPUT_DIR
-
-IS_WINDOWS = os.name == 'nt'
-
-def find_executable(names):
-    """Find the first available executable.
-    Handles: bare names (ffmpeg), .exe variants (ffmpeg.exe),
-    and absolute paths (/usr/local/bin/ffmpeg).
-    """
-    for name in names:
-        # Check absolute/relative path directly
-        if '/' in name or '\\' in name:
-            if Path(name).exists() and Path(name).is_file():
-                return name
-            continue
-        # Check PATH via which
-        if shutil.which(name):
-            return name
-        if IS_WINDOWS:
-            exe = name + '.exe'
-            if shutil.which(exe):
-                return exe
-            for base in [os.environ.get('LOCALAPPDATA', ''), os.environ.get('PROGRAMFILES', ''), 'C:\\Program Files']:
-                c = Path(base) / exe
-                if c.exists(): return str(c)
-    return None
+from scripts.platform_utils import find_executable
 
 def _get_api_key():
+    """Read the SiliconFlow key only from explicit Video2Doc configuration."""
     key = os.environ.get("SILICONFLOW_API_KEY", "")
     if key: return key
     cfg = Path.home() / ".video2doc" / "config.json"
     if cfg.exists():
         try:
-            d = json.loads(cfg.read_text())
+            d = json.loads(cfg.read_text(encoding="utf-8"))
             if d.get("siliconflow_api_key"): return d["siliconflow_api_key"]
         except: pass
-    wb = Path.home() / ".workbuddy" / "MEMORY.md"
-    if wb.exists():
-        m = re.search(r'SILICONFLOW_API_KEY:\s*(sk-[a-zA-Z0-9]+)', wb.read_text())
-        if m: return m.group(1)
     return ""
 
 def resolve_url(url):
+    curl = find_executable(["curl", "curl.exe"])
+    if not curl:
+        return url
     try:
         r = subprocess.run(
-            ["curl", "-sI", "-o", "/dev/null", "-w", "%{url_effective}", "-L", url],
-            capture_output=True, text=True, timeout=10)
+            [curl, "-sI", "-o", os.devnull, "-w", "%{url_effective}", "-L", url],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=10)
         return r.stdout.strip() or url
-    except:
+    except Exception:
         return url
 
 def download_video(job):
@@ -61,6 +38,8 @@ def download_video(job):
     """
     full_url = resolve_url(job.url)
     job.url = full_url
+    job.status = "downloading"
+    job.progress = max(int(getattr(job, "progress", 0) or 0), 20)
     raw_dir = job.dir / "raw"
     raw_dir.mkdir(exist_ok=True)
 
@@ -87,14 +66,22 @@ def download_video(job):
         ff_bin = find_executable(["ffmpeg", "ffmpeg.exe",
                                   str(Path.home() / ".workbuddy/binaries/ffmpeg/ffmpeg")])
         ff_loc = ["--ffmpeg-location", str(Path(ff_bin).parent)] if ff_bin else []
+        cookie_ok = False
         try:
-            subprocess.run([yt, "--cookies-from-browser", "chrome"] + sub_opts + ff_loc +
-                           ["-o", str(raw_dir / "video.%(ext)s"), full_url],
-                          capture_output=True, timeout=300)
+            cookie_result = subprocess.run(
+                [yt, "--cookies-from-browser", "chrome"] + sub_opts + ff_loc +
+                ["-o", str(raw_dir / "video.%(ext)s"), full_url],
+                capture_output=True, timeout=300)
+            cookie_ok = cookie_result.returncode == 0
         except Exception:
-            subprocess.run([yt] + sub_opts + ff_loc +
-                           ["-o", str(raw_dir / "video.%(ext)s"), full_url],
-                          capture_output=True, timeout=300)
+            cookie_ok = False
+        if not cookie_ok:
+            try:
+                subprocess.run([yt] + sub_opts + ff_loc +
+                               ["-o", str(raw_dir / "video.%(ext)s"), full_url],
+                              capture_output=True, timeout=300)
+            except Exception:
+                pass
         for ext in ["mp4", "webm", "mkv", "flv"]:
             f = raw_dir / f"video.{ext}"
             if f.exists(): return str(f)
@@ -148,7 +135,8 @@ def _download_douyin_iesdouyin(url, raw_dir, job):
         m = re.search(r'/video/(\d+)', url)
         if not m:
             r = subprocess.run([curl, "-sI", "-L", "-H", f"User-Agent: {MOBILE_UA}", url],
-                               capture_output=True, text=True, timeout=15)
+                               capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=15)
             for line in r.stdout.split('\n'):
                 if 'location:' in line.lower():
                     url = line.split(':', 1)[1].strip()
@@ -160,7 +148,8 @@ def _download_douyin_iesdouyin(url, raw_dir, job):
         # 2) 抓 iesdouyin 分享页
         share = f"https://www.iesdouyin.com/share/video/{vid}"
         r = subprocess.run([curl, "-s", "-L", "-H", f"User-Agent: {MOBILE_UA}", share],
-                           capture_output=True, text=True, timeout=30)
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=30)
         html = r.stdout
         # 3) 提取 window._ROUTER_DATA
         match = re.search(r'window\._ROUTER_DATA\s*=\s*(.*?)</script>', html, re.DOTALL)
@@ -204,7 +193,8 @@ def _download_xhs_initial_state(url, raw_dir, job):
         if cookie:
             hdr += ["-H", f"Cookie: {cookie}"]
         r = subprocess.run([curl, "-s", "-L"] + hdr + [url],
-                           capture_output=True, text=True, timeout=30)
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=30)
         html = r.stdout
         # 风控检测
         if "请通过小红书" in html or "verify" in html.lower()[:2000]:
@@ -412,13 +402,13 @@ def extract_audio(video_path, output_path):
     except: return False
 
 def _get_doubao_key():
-    """读取豆包语音 API Key：env DOUBAO_API_KEY → ~/.video2doc/config.json → MEMORY.md。"""
+    """读取豆包语音 API Key：环境变量 → Video2Doc 专用配置。"""
     key = os.environ.get("DOUBAO_API_KEY", "")
     if key: return key
     cfg = Path.home() / ".video2doc" / "config.json"
     if cfg.exists():
         try:
-            d = json.loads(cfg.read_text())
+            d = json.loads(cfg.read_text(encoding="utf-8"))
             if d.get("doubao_api_key"): return d["doubao_api_key"]
         except: pass
     return ""
@@ -561,11 +551,13 @@ def _transcribe_tele(audio_path, job):
         r = subprocess.run(
             [curl, "-s", "--max-time", "120", "--retry", "3", "--retry-delay", "2",
              "https://api.siliconflow.cn/v1/audio/transcriptions",
-             "-H", f"Authorization: Bearer {api_key}",
+             "-H", "@-",
              "-F", f"file=@{audio_path}",
              "-F", "model=TeleAI/TeleSpeechASR",
              "-F", "response_format=verbose_json"],
-            capture_output=True, text=True, timeout=130)
+            input=f"Authorization: Bearer {api_key}\r\n",
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=130)
         data = json.loads(r.stdout)
         if data and data.get("text"):
             return data
@@ -584,15 +576,22 @@ def transcribe(audio_path, job):
 
     - auto: 豆包 → TeleSpeechASR → FunASR → Whisper 自动降级（首选额度耗尽/不稳定时
       静默切到下一级，并在 engine_note 里提示用户）。
+    - local_only: auto 仅尝试 FunASR → Whisper；显式选择云引擎会直接拒绝。
     - doubao/tele/funasr/whisper: 仅用指定引擎；失败时 error 提示可切换其他引擎。
     返回 {text, segments} 或 None。成功时 job.engine_used 记录所用引擎。
     """
     engines = [("doubao", _transcribe_doubao), ("tele", _transcribe_tele),
                ("funasr", _transcribe_funasr), ("whisper", _transcribe_whisper)]
+    local_engines = [("funasr", _transcribe_funasr), ("whisper", _transcribe_whisper)]
     engine_map = dict(engines)
     engine = (getattr(job, "engine", None) or "auto").lower()
+    local_only = bool(getattr(job, "local_only", False))
+    if local_only and engine in ("doubao", "tele"):
+        job.error = (f"local_only 模式不允许云端引擎「{engine}」；"
+                     "请选择 funasr、whisper 或 auto")
+        return None
     if engine == "auto":
-        order = engines
+        order = local_engines if local_only else engines
     else:
         fn = engine_map.get(engine)
         if not fn:
@@ -613,7 +612,8 @@ def transcribe(audio_path, job):
 
     # 全部失败
     if engine == "auto":
-        job.error = f"所有引擎均失败（{'→'.join(failed)}）。可在「引擎」下拉切换后重试。"
+        scope = "本地引擎" if local_only else "所有引擎"
+        job.error = f"{scope}均失败（{'→'.join(failed)}）。可在「引擎」下拉切换后重试。"
     else:
         base = job.error or f"{engine} 转录失败"
         job.error = f"{base}（可切换其他引擎重试：引擎下拉选择）"
@@ -674,7 +674,8 @@ def _transcribe_funasr(audio_path, job):
                 if fp:
                     r = subprocess.run([fp, "-v", "error", "-show_entries", "format=duration",
                                         "-of", "csv=p=0", str(audio_path)],
-                                       capture_output=True, text=True, timeout=30)
+                                       capture_output=True, text=True, encoding="utf-8",
+                                       errors="replace", timeout=30)
                     dur = float(r.stdout.strip()) if r.stdout.strip() else 0
                     if dur:
                         segments[-1]["end"] = dur
@@ -731,19 +732,21 @@ def _enrich_transcript(text, job):
     prompt = ("请阅读下面视频文稿，输出 JSON：{\"summary\":\"一句话摘要\","
               "\"keypoints\":[\"要点1\",\"要点2\",...],\"tags\":[\"标签1\",...]}。"
               "要点3-5条，标签3-5个。只输出 JSON。\n\n文稿：\n" + snippet)
-    curl = find_executable(["curl", "curl.exe"]) or "curl"
     body = json.dumps({
         "model": "deepseek-ai/DeepSeek-V3",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3, "max_tokens": 700,
-    })
+    }).encode("utf-8")
     try:
-        r = subprocess.run([curl, "-s", "--max-time", "60", "--retry", "2",
+        import urllib.request
+        req = urllib.request.Request(
             "https://api.siliconflow.cn/v1/chat/completions",
-            "-H", f"Authorization: Bearer {key}",
-            "-H", "Content-Type: application/json",
-            "-d", body], capture_output=True, text=True, timeout=70)
-        data = json.loads(r.stdout)
+            data=body,
+            headers={"Authorization": f"Bearer {key}",
+                     "Content-Type": "application/json"},
+            method="POST")
+        with urllib.request.urlopen(req, timeout=70) as response:
+            data = json.loads(response.read().decode("utf-8"))
         content = data["choices"][0]["message"]["content"]
         m = re.search(r'\{.*\}', content, re.DOTALL)
         if m:
@@ -751,6 +754,15 @@ def _enrich_transcript(text, job):
         return None
     except Exception:
         return None  # 增强失败不阻断主流程
+
+
+def _should_enrich(job):
+    """Return whether cloud transcript enrichment is allowed for this job."""
+    formats = {str(item).strip().lower() for item in getattr(job, "formats", [])}
+    supports_enrichment = bool(formats & {"md", "json", "all"})
+    return (bool(getattr(job, "allow_enrichment", True))
+            and not bool(getattr(job, "local_only", False))
+            and supports_enrichment)
 
 
 def _enrichment_block(enrichment):
@@ -915,7 +927,8 @@ def run_transcribe_pipeline(job):
             job.duration = f"{int(t)//60:02d}:{int(t)%60:02d}"
 
         job.status = "exporting"; job.progress = 85
-        enrichment = _enrich_transcript(transcript.get("text", ""), job)
+        enrichment = (_enrich_transcript(transcript.get("text", ""), job)
+                      if _should_enrich(job) else None)
         job.files = export_formats(job, transcript, enrichment)
         job.status = "done"; job.progress = 100
     except Exception as e:
@@ -947,14 +960,15 @@ def run_local_pipeline(job, file_path):
             return
 
         (job.dir / "raw" / "tele_result.json").write_text(json.dumps(transcript, ensure_ascii=False, indent=2))
-        job.title = fp.name
+        job.title = getattr(job, "local_filename", "") or fp.name
         segs = transcript.get("segments",[])
         if segs:
             t = segs[-1].get("end",0)
             job.duration = f"{int(t)//60:02d}:{int(t)%60:02d}"
 
         job.status = "exporting"; job.progress = 85
-        enrichment = _enrich_transcript(transcript.get("text", ""), job)
+        enrichment = (_enrich_transcript(transcript.get("text", ""), job)
+                      if _should_enrich(job) else None)
         job.files = export_formats(job, transcript, enrichment)
         job.status = "done"; job.progress = 100
     except Exception as e:

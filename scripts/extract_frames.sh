@@ -7,6 +7,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/python_cmd.sh"
+PYTHON_BIN="$(video2doc_find_python)"
+
 VIDEO="${1:?Usage: $0 <VIDEO_FILE> <CHAPTERS_CSV> <OUTPUT_DIR>}"
 CHAPTERS_CSV="${2:?Usage: $0 <VIDEO_FILE> <CHAPTERS_CSV> <OUTPUT_DIR>}"
 OUTPUT_DIR="${3:?Usage: $0 <VIDEO_FILE> <CHAPTERS_CSV> <OUTPUT_DIR>}"
@@ -44,7 +48,8 @@ process_chapter() {
     
     # For longer chapters, use parallel shard extraction
     # Sample at 1 frame per 5 seconds (~12 frames/min, good coverage)
-    local fps=$(python3 -c "print(max(0.2, min(2, 60/$chapter_len)))")
+    local fps
+    fps=$("$PYTHON_BIN" -c "print(max(0.2, min(2, 60/$chapter_len)))")
     
     ffmpeg -ss "$start_sec" -to "$end_sec" \
         -i "$VIDEO" \
@@ -52,18 +57,23 @@ process_chapter() {
         -q:v 3 \
         "$TMPDIR/${ch_label}_%04d.jpg" -y 2>/dev/null
     
-    local frame_count=$(ls "$TMPDIR/${ch_label}_"*.jpg 2>/dev/null | wc -l | tr -d ' ')
+    local frame_count
+    frame_count=$(ls "$TMPDIR/${ch_label}_"*.jpg 2>/dev/null | wc -l | tr -d ' ')
     echo "    → Extracted $frame_count candidate frames"
     
     # Select the best frame: largest file size (generally = most detail/information)
-    local best_frame=$(ls -S "$TMPDIR/${ch_label}_"*.jpg 2>/dev/null | head -1)
+    local best_frame
+    best_frame=$(ls -S "$TMPDIR/${ch_label}_"*.jpg 2>/dev/null | head -1)
     if [[ -n "$best_frame" ]]; then
         # Extract timestamp from filename (approximate by frame number)
-        local frame_num=$(echo "$best_frame" | grep -oP '\d{4}(?=\.jpg)')
-        local est_time=$(python3 -c "print(int($start_sec + int('$frame_num') / $fps))")
+        local frame_base frame_num est_time
+        frame_base=$(basename "$best_frame" .jpg)
+        frame_num="${frame_base##*_}"
+        est_time=$("$PYTHON_BIN" -c "print(int($start_sec + int('$frame_num') / $fps))")
         
         cp "$best_frame" "$OUTPUT_DIR/${ch_label}_${est_time}s.jpg"
-        local fsize=$(ls -lh "$best_frame" | awk '{print $5}')
+        local fsize
+        fsize=$(ls -lh "$best_frame" | awk '{print $5}')
         echo "    → Selected best frame: frame #$frame_num (~${est_time}s), ${fsize}"
     fi
     

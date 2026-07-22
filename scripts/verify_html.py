@@ -9,23 +9,43 @@ import sys
 import os
 from pathlib import Path
 
+try:
+    from .platform_utils import find_executable
+except ImportError:  # Direct execution: python scripts/verify_html.py
+    from platform_utils import find_executable
 
-def find_chrome():
-    """Find Chrome/Chromium executable on macOS."""
+
+def chrome_candidates(*, os_name=None, environ=None):
+    """Return standard browser install locations for the requested platform."""
+    os_name = os.name if os_name is None else os_name
+    environ = os.environ if environ is None else environ
     candidates = [
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         "/Applications/Chromium.app/Contents/MacOS/Chromium",
         "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
     ]
+    if os_name == "nt":
+        for base_name in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+            base = environ.get(base_name)
+            if not base:
+                continue
+            candidates.extend([
+                str(Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe"),
+                str(Path(base) / "Microsoft" / "Edge" / "Application" / "msedge.exe"),
+            ])
+    return candidates
+
+
+def find_chrome():
+    """Find Chrome/Chromium on Windows, macOS, or Linux."""
+    candidates = chrome_candidates()
     for c in candidates:
         if os.path.exists(c):
             return c
-    # Try which
-    for name in ["google-chrome", "chromium", "chromium-browser"]:
-        result = subprocess.run(["which", name], capture_output=True, text=True)
-        if result.returncode == 0:
-            return result.stdout.strip()
-    return None
+    return find_executable([
+        "chrome", "chrome.exe", "msedge", "msedge.exe",
+        "google-chrome", "chromium", "chromium-browser",
+    ])
 
 
 def main():
@@ -33,14 +53,14 @@ def main():
         print(f"Usage: {sys.argv[0]} <HTML_FILE> <OUTPUT_DIR>")
         sys.exit(1)
 
-    html_file = os.path.abspath(sys.argv[1])
-    output_dir = os.path.abspath(sys.argv[2])
+    html_file = Path(sys.argv[1]).resolve()
+    output_dir = Path(sys.argv[2]).resolve()
 
-    if not os.path.exists(html_file):
+    if not html_file.is_file():
         print(f"ERROR: HTML file not found: {html_file}")
         sys.exit(1)
 
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     chrome = find_chrome()
     if not chrome:
@@ -52,7 +72,7 @@ def main():
     print(f"Output dir: {output_dir}")
 
     # Step 1: Full-page screenshot
-    full_page_png = os.path.join(output_dir, "full_page.png")
+    full_page_png = output_dir / "full_page.png"
     print("\n=== Step 1: Taking full-page screenshot ===")
 
     result = subprocess.run(
@@ -64,10 +84,12 @@ def main():
             "--window-size=1280,900",
             "--virtual-time-budget=15000",
             "--hide-scrollbars",
-            f"file://{html_file}",
+            html_file.as_uri(),
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=60,
     )
 
@@ -76,14 +98,18 @@ def main():
         print(result.stderr[-500:] if result.stderr else "(no stderr)")
         sys.exit(1)
 
-    if not os.path.exists(full_page_png):
+    if not full_page_png.is_file():
         print("ERROR: Screenshot was not created!")
         sys.exit(1)
 
     # Get image dimensions
+    ffprobe = find_executable(["ffprobe", "ffprobe.exe"])
+    if not ffprobe:
+        print("ERROR: ffprobe not found!")
+        sys.exit(1)
     probe = subprocess.run(
         [
-            "ffprobe",
+            ffprobe,
             "-v", "error",
             "-select_streams", "v:0",
             "-show_entries", "stream=width,height",
@@ -92,11 +118,20 @@ def main():
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
-    width, height = probe.stdout.strip().split(",")
+    if probe.returncode != 0:
+        print(f"ERROR: ffprobe failed: {probe.stderr.strip()}")
+        sys.exit(1)
+    try:
+        width, height = probe.stdout.strip().split(",")
+    except ValueError:
+        print("ERROR: ffprobe returned invalid image dimensions")
+        sys.exit(1)
     width, height = int(width), int(height)
     print(f"Screenshot dimensions: {width}x{height}px")
-    print(f"File size: {os.path.getsize(full_page_png) / 1024:.0f} KB")
+    print(f"File size: {full_page_png.stat().st_size / 1024:.0f} KB")
 
     # Step 2: Crop with overlap
     print("\n=== Step 2: Cropping with 100px overlap ===")
@@ -107,14 +142,19 @@ def main():
     num_slices = max(1, (height + effective_height - 1) // effective_height)
     print(f"Generating {num_slices} slices...")
 
+    ffmpeg = find_executable(["ffmpeg", "ffmpeg.exe"])
+    if not ffmpeg:
+        print("ERROR: ffmpeg not found!")
+        sys.exit(1)
+
     for i in range(num_slices):
         y_offset = max(0, i * effective_height)
         actual_height = min(slice_height, height - y_offset)
-        slice_path = os.path.join(output_dir, f"slice_{i+1:02d}.png")
+        slice_path = output_dir / f"slice_{i+1:02d}.png"
 
         subprocess.run(
             [
-                "ffmpeg",
+                ffmpeg,
                 "-i", full_page_png,
                 "-vf", f"crop={width}:{actual_height}:0:{y_offset}",
                 "-y",
@@ -124,7 +164,7 @@ def main():
             check=True,
         )
 
-        fsize = os.path.getsize(slice_path) / 1024
+        fsize = slice_path.stat().st_size / 1024
         print(f"  slice_{i+1:02d}.png: y={y_offset}, {width}x{actual_height}px, {fsize:.0f} KB")
 
     print("\n=== Verification complete ===")

@@ -30,6 +30,34 @@ def load_rules(domain=None):
 
     return all_exact, all_context, all_fuzzy
 
+
+def _python_replacement(replacement):
+    r"""Convert JSON/JavaScript-style $1 groups to Python's \g<1> syntax."""
+    return re.sub(r"\$(\d+)", lambda m: rf"\g<{m.group(1)}>", replacement)
+
+
+def _apply_context_rule(text, rule):
+    """Apply one rule only when its configured before/after context matches."""
+    old = rule["from"]
+    new = rule["to"]
+    before = rule.get("contextBefore", rule.get("contextBeforeRule", ""))
+    after = rule.get("contextAfter", rule.get("contextAfterRule", ""))
+    flags = 0 if rule.get("caseSensitive", False) else re.IGNORECASE
+
+    pieces = []
+    if before:
+        pieces.append(f"(?P<_before>{before})")
+    pieces.append(f"(?P<_target>{re.escape(old)})")
+    if after:
+        pieces.append(f"(?=(?:{after}))")
+    pattern = "".join(pieces)
+
+    def replace(match):
+        prefix = match.groupdict().get("_before", "") or ""
+        return prefix + new
+
+    return re.subn(pattern, replace, text, flags=flags)
+
 def apply_corrections(text, exact_rules, context_rules, fuzzy_rules, stats=False):
     corrections_made = []
 
@@ -37,10 +65,12 @@ def apply_corrections(text, exact_rules, context_rules, fuzzy_rules, stats=False
     for rule in exact_rules:
         old = rule["from"]
         new = rule["to"]
-        case_sensitive = rule.get("caseSensitive", False)
-        flags = 0 if case_sensitive else re.IGNORECASE
-        count = len(re.findall(re.escape(old), text, flags)) if stats else 0
-        text = re.sub(re.escape(old), new, text, flags=flags)
+        if rule.get("contextBeforeRule") or rule.get("contextAfterRule"):
+            text, count = _apply_context_rule(text, rule)
+        else:
+            case_sensitive = rule.get("caseSensitive", False)
+            flags = 0 if case_sensitive else re.IGNORECASE
+            text, count = re.subn(re.escape(old), lambda _m: new, text, flags=flags)
         if count > 0:
             corrections_made.append(f"  {old} → {new} (x{count})")
 
@@ -48,33 +78,19 @@ def apply_corrections(text, exact_rules, context_rules, fuzzy_rules, stats=False
     for rule in context_rules:
         old = rule["from"]
         new = rule["to"]
-        before = rule.get("contextBefore", "")
-        after = rule.get("contextAfter", "")
-        pattern = old
-        if before:
-            pattern = before + pattern
-        if after:
-            pattern = pattern + after
-        # Simple context-aware replace
-        repl = new
-        if before:
-            repl = before + repl
-        if after:
-            repl = repl + after
-        count = 0
-        if old in text:
-            text = text.replace(old, new)
-            count = 1
+        before = rule.get("contextBefore", rule.get("contextBeforeRule", ""))
+        after = rule.get("contextAfter", rule.get("contextAfterRule", ""))
+        text, count = _apply_context_rule(text, rule)
         if count > 0:
-            corrections_made.append(f"  {old} → {new} [context: {before}...{after}]")
+            corrections_made.append(
+                f"  {old} → {new} [context: {before}...{after}] (x{count})")
 
     # Phase 3: Fuzzy regex patterns
     for rule in fuzzy_rules:
         pattern = rule.get("from_pattern", "")
         replacement = rule.get("to", "")
         if pattern:
-            count = len(re.findall(pattern, text)) if stats else 0
-            text = re.sub(pattern, replacement, text)
+            text, count = re.subn(pattern, _python_replacement(replacement), text)
             if count > 0:
                 corrections_made.append(f"  regex:{pattern} → {replacement} (x{count})")
 

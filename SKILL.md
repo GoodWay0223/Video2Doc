@@ -286,7 +286,7 @@ curl -s --max-time 60 --retry 3 --retry-delay 2 \
 
 #### 1st: 豆包录音文件识别大模型 2.0（首选云端）
 
-**云端首选引擎**（实测中文准确率 78%，显著优于 TeleSpeechASR 22%）。官方文档：
+**云端首选引擎**（一次项目样本的 9 个关键术语命中 7/9，TeleSpeechASR 为 2/9；该结果不是通用准确率或 WER 基准）。官方文档：
 https://www.volcengine.com/docs/6561/1354868
 
 **获取 X-Api-Key**：新版控制台 → API 密钥管理
@@ -1088,8 +1088,11 @@ For cloud API, source `scripts/load_config.sh` (env var → ~/.video2doc/config.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/check_setup.sh` | Environment health check (bash, Mac/Linux) |
-| `scripts/check_setup.py` | 🆕 跨平台环境自检 (Python, Win/Mac/Linux) — `python3 scripts/check_setup.py` |
+| `scripts/check_setup.sh` | Environment health check (bash, macOS/Linux/Git Bash) |
+| `scripts/check_setup.py` | Cross-platform environment check (Python, Windows/macOS/Linux) |
+| `scripts/platform_utils.py` | Cross-platform executable discovery |
+| `scripts/python_cmd.sh` | Resolve a real Python 3.10+ command for shell entry points |
+| `scripts/build_release.py` | Reproducible ZIP + SHA-256 + manifest release builder |
 | `scripts/load_config.sh` | Cross-Agent API key loader (source to get `$SILICONFLOW_API_KEY`) |
 | `scripts/export_formats.py` | Convert TeleSpeechASR output → SRT/TXT/JSON/MD |
 | `scripts/apply_corrections.py` | Apply `references/corrections.json` rules to fix ASR errors |
@@ -1106,16 +1109,20 @@ For cloud API, source `scripts/load_config.sh` (env var → ~/.video2doc/config.
 This skill follows [Semantic Versioning](https://semver.org/). Releases are
 packaged as `Video2Doc-v{MAJOR}.{MINOR}.{PATCH}.zip` and published to GitHub.
 
-**Release workflow** (run after any SKILL.md or script change):
+**Release workflow** (replace `X.Y.Z` with the version declared in CHANGELOG):
 ```bash
-cd ~/.workbuddy/skills/Video2Doc
-VERSION=v0.1.0  # bump as needed
-git add -A && git commit -m "feat: description" && git push
-git tag -a $VERSION -m "Video2Doc $VERSION" && git push origin $VERSION
-# Then create GitHub Release with zip asset
+python -m unittest discover -s tests -p "test_*.py"
+# Commit through the normal review flow, push, and wait for Windows/macOS CI.
+python scripts/build_release.py --version X.Y.Z --output-dir dist
+git tag -a vX.Y.Z -m "Video2Doc vX.Y.Z"
+git push origin vX.Y.Z
+gh release create vX.Y.Z dist/Video2Doc-vX.Y.Z.zip \
+  dist/Video2Doc-vX.Y.Z.zip.sha256 --verify-tag
 ```
 
 After releasing, the agent should confirm:
+- [ ] Windows/macOS CI passed for the release commit
 - [ ] Tag pushed to GitHub
-- [ ] Release created with `Video2Doc-{VERSION}.zip` asset
+- [ ] Release created with both ZIP and `.zip.sha256` assets
+- [ ] ZIP manifest/version/executable modes verified
 - [ ] CHANGELOG.md updated

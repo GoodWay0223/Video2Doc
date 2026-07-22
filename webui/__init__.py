@@ -1,2 +1,3 @@
-"""Video2Doc Web UI package version 0.4.0"""
-__version__ = "0.4.0"
+"""Video2Doc Web UI package metadata."""
+
+__version__ = "0.6.0"
