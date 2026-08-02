@@ -55,6 +55,7 @@ EXCLUDED_FILE_NAMES = {
     ".coverage",
     ".DS_Store",
     ".env",
+    ".git",
     "cookies.txt",
     "desktop.ini",
     "playwright_state.json",

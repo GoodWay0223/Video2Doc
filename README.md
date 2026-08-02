@@ -13,8 +13,8 @@
 
 前往 [GitHub Releases](https://github.com/GoodWay0223/Video2Doc/releases/latest)，优先下载：
 
-- `Video2Doc-v0.6.0.zip` — Windows/macOS 共用的跨平台源码包
-- `Video2Doc-v0.6.0.zip.sha256` — ZIP 的 SHA-256 校验值
+- `Video2Doc-v0.7.0.zip` — Windows/macOS 共用的跨平台源码包
+- `Video2Doc-v0.7.0.zip.sha256` — ZIP 的 SHA-256 校验值
 
 该 ZIP 不是 `.exe` 或 `.app` 安装包，仍需本机安装 Python 3.10+ 和 ffmpeg。GitHub 自动生成的 “Source code” 归档没有经过项目发布构建器的清理、清单与跨平台启动器检查，因此不作为首选下载。
 
@@ -93,7 +93,7 @@ CI 验证的是核心代码、启动器和发布包结构，不代表抖音/B站
 | **Windows** | `winget install ffmpeg` 或下载 [ffmpeg.org](https://ffmpeg.org) |
 | **Linux** | `sudo apt install ffmpeg` |
 
-### 第三步：安装 yt-dlp（B站 / YouTube 等平台下载）
+### 第三步：安装 yt-dlp（字幕、登录画质与通用平台兜底）
 
 ```bash
 # Windows
@@ -115,6 +115,13 @@ Video2Doc 不会自动下载、安装、覆盖文件或执行升级命令。检�
 > YouTube 页面变化较快。完整支持通常还需要 yt-dlp 推荐的 JavaScript runtime（优先 Deno，也可使用受支持的 Node.js/Bun/QuickJS）及相关 EJS 组件；地区、账号和页面变化仍可能影响结果。
 
 如果已经安装 [uv](https://docs.astral.sh/uv/)，也可以使用 `uv tool install yt-dlp`；uv 不是运行 Video2Doc 的必需依赖。
+
+抖音的快速签名音轨和最终 MediaRecorder 回退需要 Python Playwright；不使用抖音时可不安装：
+
+```powershell
+python -m pip install playwright
+python -m playwright install chromium
+```
 
 ### 第四步：配置云端 API Key（至少一种）
 
@@ -180,6 +187,25 @@ python webui.py
 - 📥 **视频下载** — 下载支持平台当前可获取的视频文件
 - 🎙️ **链接转文稿** — 平台字幕优先；无字幕时使用已配置的识别引擎
 - 📤 **本地文件转文稿** — 上传本地文件；可显式开启“仅本机处理”
+
+### B站与抖音默认路径
+
+| 平台 | 链接转文稿 | 纯视频下载 |
+|------|------------|------------|
+| B站 | 平台字幕 → 公共 DASH 音轨 → yt-dlp 音频兜底 | 显式 Cookie yt-dlp（登录画质）→ 公共 DASH 音视频 → yt-dlp 兜底 |
+| 抖音 | 隔离 Playwright 签名音轨 → 移动分享 MP4 提取音频 → 显式 Cookie yt-dlp → MediaRecorder | 移动分享 MP4 → 隔离 Playwright DASH → 显式 Cookie yt-dlp → MediaRecorder |
+
+每条成功路径都会经 ffprobe 校验音轨、视频轨、时长与文件完整性，并在任务的 `raw/download.trace.json` 中留下已脱敏的尝试记录。HTTP 412、403/410、页面加载超时会切换到不同原理的后备路径，不会把完全相同的失败请求无限重试。
+
+浏览器里已经登录 B站/抖音，不代表独立运行的 Video2Doc 自动拥有该登录态。默认不会读取正在运行的 Chrome Cookie 数据库；只有登录画质或受限内容确实需要时，才应显式配置导出的 cookies.txt 或抖音 Playwright storage state。公开内容通常不需要 Cookie。
+
+Windows 的“Beta 版：使用 Unicode UTF-8”开关不是运行本项目的前置条件。v0.7.0 明确按 UTF-8 读写，并兼容旧 GB18030 配置；建议程序自身处理编码，不依赖全局系统区域设置来修复第三方项目。
+
+用于采集诊断、但不执行转录的统一命令：
+
+```powershell
+python scripts\acquire_media.py "视频链接或分享文本" --output-dir output\smoke --purpose audio
+```
 
 ### 2. CLI 命令行（实验性）
 
@@ -278,28 +304,28 @@ python3 scripts/check_setup.py
 
 ## 升级与发布包校验
 
-### 从 v0.5.0 升级
+### 从 v0.6.0 升级
 
-1. 下载新的 `Video2Doc-v0.6.0.zip`，解压到新目录；不要直接覆盖正在运行的旧目录。
+1. 下载新的 `Video2Doc-v0.7.0.zip`，解压到新目录；不要直接覆盖正在运行的旧目录。
 2. API Key 继续使用系统环境变量或 `~/.video2doc/config.json`，发布包不包含任何凭据。
 3. 如需保留旧任务，请单独备份旧目录中的 `output/`；新发布包不会包含运行产物。
-4. 重新运行 `python -m pip install -r requirements.txt` 和环境自检，再启动 v0.6.0。
-5. v0.6.0 默认只监听 `127.0.0.1`。如过去依赖局域网访问，需要显式传入 `--host 0.0.0.0`；该模式当前没有认证或 HTTPS，不适合敏感文件。
+4. 重新运行 `python -m pip install -r requirements.txt` 和环境自检，再启动 v0.7.0。
+5. v0.7.0 默认只监听 `127.0.0.1`。如过去依赖局域网访问，需要显式传入 `--host 0.0.0.0`；该模式当前没有认证或 HTTPS，不适合敏感文件。
 
 ### 验证 SHA-256
 
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\Video2Doc-v0.6.0.zip -Algorithm SHA256
-Get-Content .\Video2Doc-v0.6.0.zip.sha256
+Get-FileHash .\Video2Doc-v0.7.0.zip -Algorithm SHA256
+Get-Content .\Video2Doc-v0.7.0.zip.sha256
 ```
 
 macOS：
 
 ```bash
-shasum -a 256 Video2Doc-v0.6.0.zip
-cat Video2Doc-v0.6.0.zip.sha256
+shasum -a 256 Video2Doc-v0.7.0.zip
+cat Video2Doc-v0.7.0.zip.sha256
 ```
 
 两边的哈希值必须完全一致。ZIP 内还包含 `RELEASE-MANIFEST.json`，列出每个源码文件的大小与 SHA-256。
@@ -341,6 +367,7 @@ Video2Doc/
 │   ├── check_setup.py          # 跨平台环境自检
 │   ├── check_setup.sh          # 环境自检（Shell 版）
 │   ├── build_release.py        # 安全、可复现的发布包构建器
+│   ├── acquire_media.py        # 与 Web UI 共用的两平台采集诊断入口
 │   ├── load_config.sh          # 配置加载
 │   ├── export_formats.py       # 多格式导出
 │   ├── apply_corrections.py    # 校正规则应用
@@ -348,6 +375,8 @@ Video2Doc/
 ├── webui/                      # Web UI 后端包
 │   ├── server.py
 │   ├── pipeline.py
+│   ├── bilibili.py             # B站公共 DASH 采集
+│   ├── douyin.py               # 抖音 SSR/签名媒体采集
 │   ├── job_manager.py
 │   ├── templates.py
 │   └── static/

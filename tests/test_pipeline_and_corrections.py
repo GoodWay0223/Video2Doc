@@ -119,6 +119,21 @@ class JobAndPipelineTests(unittest.TestCase):
         doubao.assert_not_called()
         self.assertIn("local_only", job.error)
 
+    def test_whisper_model_can_be_selected_explicitly(self):
+        job = make_job(".")
+        fake_model = mock.Mock()
+        fake_model.transcribe.return_value = {
+            "text": "测试",
+            "segments": [{"start": 0, "end": 1, "text": "测试"}],
+        }
+        fake_whisper = mock.Mock()
+        fake_whisper.load_model.return_value = fake_model
+        with mock.patch.dict(os.environ, {"VIDEO2DOC_WHISPER_MODEL": "tiny"}), \
+             mock.patch.dict("sys.modules", {"whisper": fake_whisper}):
+            result = pipeline._transcribe_whisper("audio.mp3", job)
+        fake_whisper.load_model.assert_called_once_with("tiny")
+        self.assertEqual("测试", result["text"])
+
     def test_local_only_and_disabled_flag_both_skip_cloud_enrichment(self):
         cases = [
             {"local_only": True, "allow_enrichment": True},
@@ -161,32 +176,25 @@ class JobAndPipelineTests(unittest.TestCase):
                 job = make_job(".", formats=formats, allow_enrichment=True)
                 self.assertFalse(pipeline._should_enrich(job))
 
-    def test_cookie_failure_retries_ytdlp_without_browser_cookie(self):
+    def test_default_ytdlp_does_not_read_live_browser_cookies(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            args, mode = pipeline._cookie_args("bilibili")
+        self.assertEqual([], args)
+        self.assertEqual("none", mode)
+        self.assertNotIn("--cookies-from-browser", args)
+
+    def test_explicit_cookie_file_is_supported_without_flattening_browser_state(self):
         with workspace_temp_dir() as temp_dir:
-            job = make_job(temp_dir)
-            job.url = "https://example.com/video"
-            calls = []
-
-            def find_executable(names):
-                return "yt-dlp" if names[0].startswith("yt-dlp") else None
-
-            def run(args, **kwargs):
-                calls.append(args)
-                if "--cookies-from-browser" in args:
-                    return subprocess.CompletedProcess(args, 1)
-                raw_dir = Path(temp_dir) / "raw"
-                (raw_dir / "video.mp4").write_bytes(b"x" * 100001)
-                return subprocess.CompletedProcess(args, 0)
-
-            with mock.patch.object(pipeline, "resolve_url", return_value=job.url), \
-                 mock.patch.object(pipeline, "find_executable", side_effect=find_executable), \
-                 mock.patch.object(pipeline.subprocess, "run", side_effect=run):
-                result = pipeline.download_video(job)
-
-            self.assertTrue(result.endswith("video.mp4"))
-            self.assertEqual(2, len(calls))
-            self.assertIn("--cookies-from-browser", calls[0])
-            self.assertNotIn("--cookies-from-browser", calls[1])
+            cookie_file = Path(temp_dir) / "my cookies.txt"
+            cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+            with mock.patch.dict(
+                os.environ,
+                {"VIDEO2DOC_BILIBILI_COOKIES_FILE": str(cookie_file)},
+                clear=True,
+            ):
+                args, mode = pipeline._cookie_args("bilibili")
+        self.assertEqual(["--cookies", str(cookie_file)], args)
+        self.assertEqual("cookies_file", mode)
 
     def test_resolve_url_uses_platform_null_device(self):
         completed = subprocess.CompletedProcess([], 0, stdout="https://example.com/full")
@@ -197,6 +205,17 @@ class JobAndPipelineTests(unittest.TestCase):
         self.assertIn(os.devnull, run.call_args.args[0])
         self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
         self.assertEqual("replace", run.call_args.kwargs["errors"])
+
+    def test_failed_audio_extraction_does_not_accept_stale_output(self):
+        with workspace_temp_dir() as temp_dir:
+            output = Path(temp_dir) / "audio.mp3"
+            output.write_bytes(b"stale" * 1000)
+            completed = subprocess.CompletedProcess([], 1)
+            with mock.patch.object(pipeline, "find_executable", return_value="ffmpeg"), \
+                 mock.patch.object(pipeline.subprocess, "run", return_value=completed):
+                self.assertFalse(pipeline.extract_audio("video.mp4", output))
+            self.assertEqual(b"stale" * 1000, output.read_bytes())
+            self.assertFalse((Path(temp_dir) / "audio.part.mp3").exists())
 
     def test_common_binary_dirs_cover_homebrew_and_windows_package_managers(self):
         mac_dirs = platform_utils.candidate_bin_dirs(

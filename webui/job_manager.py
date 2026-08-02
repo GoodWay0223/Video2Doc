@@ -16,7 +16,7 @@ class JobType:
 class Job:
     def __init__(self, job_id=None, url="", job_type=JobType.TRANSCRIBE_ONLINE,
                  mode="transcript", formats=None, domain=None, engine="auto",
-                 local_only=False, allow_enrichment=True):
+                 local_only=False, allow_enrichment=True, job_dir=None):
         self.id = job_id or str(uuid.uuid4())[:8]
         self.url = url
         self.type = job_type
@@ -34,6 +34,9 @@ class Job:
         self.duration = ""
         self.files = []
         self.error = None
+        self.error_code = ""
+        self.download_strategy = ""
+        self.attempts = []
         self.created_at = time.time()
         # Local transcription fields
         self.local_filename = ""
@@ -41,7 +44,7 @@ class Job:
         # Download fields
         self.download_path = ""
         # Directory
-        self.dir = OUTPUT_DIR / self.id
+        self.dir = Path(job_dir) if job_dir is not None else OUTPUT_DIR / self.id
         self.dir.mkdir(parents=True, exist_ok=True)
 
     def to_dict(self):
@@ -54,6 +57,9 @@ class Job:
             "status": self.status, "progress": self.progress,
             "title": self.title, "duration": self.duration,
             "files": self.files, "error": self.error,
+            "error_code": self.error_code,
+            "download_strategy": self.download_strategy,
+            "attempts": self.attempts,
             "local_filename": self.local_filename,
             "local_filesize": self.local_filesize,
             "download_path": self.download_path,

@@ -1,6 +1,6 @@
 ---
 name: Video2Doc
-description: "Video2Doc converts videos (Douyin, Xiaohongshu, Bilibili, YouTube) into structured documentation — a clean transcript by default, with optional deep analysis mode. Handles downloading (yt-dlp + Playwright MediaRecorder with anti-bot strategy), one-step audio extraction, 5-tier transcription with engine selection (Doubao bigmodel cloud → TeleSpeechASR → SenseVoiceSmall → local FunASR → local Whisper), content chaptering, SVG generation, and parallel batch processing for multiple videos."
+description: "Video2Doc converts videos (Douyin, Xiaohongshu, Bilibili, YouTube) into structured documentation. Bilibili and Douyin use platform-aware subtitle/audio-first acquisition with classified fallbacks; transcription supports Doubao, TeleSpeechASR, local FunASR, and local Whisper, plus structured exports and optional deep analysis."
 agent_created: true
 ---
 
@@ -14,15 +14,16 @@ Convert any video (Douyin/Xiaohongshu/Bilibili/YouTube) into structured document
 
 **This Skill does NOT ship with any cookies, API keys, or credentials.**
 
-- **Cookies**: Douyin/XHS require cookies for download. Each user must provide
-  their own `cookies.txt` exported from their browser. The `.gitignore` blocks
-  `cookies.txt`, `playwright_state.json`, and all runtime media files from
-  ever being committed.
-- **API Keys**: SiliconFlow key is read from 3 sources in order: `SILICONFLOW_API_KEY` env var (recommended) → `~/.video2doc/config.json` (cross-Agent) → `~/.workbuddy/MEMORY.md` (legacy). No key is hardcoded.
+- **Cookies**: Public Bilibili and Douyin paths normally need no Cookie. Logged-in
+  quality or restricted content must use an explicitly configured `cookies.txt`,
+  browser source, or Douyin Playwright `storage_state`; live Chrome is never read
+  implicitly. `.gitignore` blocks these files and runtime media from commits.
+- **API Keys**: Keys are read only from the matching environment variable or
+  `~/.video2doc/config.json`. No key is hardcoded or discovered from unrelated files.
 - **All runtime files** (`*.mp4`, `*.mp3`, `raw/`, `output/`, etc.) are gitignored.
 
 When you share this Skill repo, recipients get only the workflow logic. They
-must supply their own cookies and API keys.
+must supply any optional login state and API keys themselves.
 
 ---
 
@@ -52,8 +53,9 @@ preference), ALWAYS present this guide before doing anything else:**
 
 ### Transcription Setup Flow
 
-**Step 1: Check if API key exists.** Look in `~/.workbuddy/MEMORY.md` for
-`SILICONFLOW_API_KEY`. If found, skip to "ready" state.
+**Step 1: Check if an API key exists.** Check the `DOUBAO_API_KEY` and
+`SILICONFLOW_API_KEY` environment variables, then `~/.video2doc/config.json`.
+Never search memory files or unrelated project files for credentials.
 
 **Step 2: If no key found, ask the user:**
 
@@ -66,12 +68,10 @@ preference), ALWAYS present this guide before doing anything else:**
 - 选项 D：用本地 Whisper → 多语言兜底，CPU 推理较慢，~1.5GB 模型
 ```
 
-**Step 3: Store the key.** When the user provides a key, store it:
+**Step 3: Store the key only with explicit user authorization.** Prefer the
+operating-system environment or `~/.video2doc/config.json`:
 ```
-→ Edit ~/.workbuddy/MEMORY.md, append:
-  ## SiliconFlow API Key
-  SILICONFLOW_API_KEY: sk-xxxxxxxxxxxx
-  (Auto-configured by Video2Doc skill)
+{"doubao_api_key": "...", "siliconflow_api_key": "..."}
 ```
 
 **Step 4: Confirm ready.** Once key is stored or user chooses local, confirm and
@@ -108,18 +108,18 @@ DEEP ANALYSIS (user asked for "深度分析"/"完整分析"/"HTML"):
 **Phase summary**:
 | Phase | Required for | Description |
 |-------|-------------|-------------|
-| 1. Download | Both | yt-dlp + cookies + metadata |
-| 2. Audio | Both | Extract MP3 + ffprobe validate (±5%) |
-| 3. Transcribe | Both | Doubao bigmodel → TeleSpeechASR → SenseVoiceSmall → local FunASR → local Whisper（可手动指定 engine） |
+| 1. Acquire | Both | Platform subtitle/audio-first routes; full video only when needed |
+| 2. Validate | Both | ffprobe audio/video/duration/integrity checks |
+| 3. Transcribe | Both | Doubao bigmodel → TeleSpeechASR → local FunASR → local Whisper（可手动指定 engine） |
 | 4. Structure | Both | Chapter breakdown, extract key points |
 | 5. SVG | Deep only | Content-driven diagrams per chapter |
 | 6. Keyframes | Deep only | UI/demo videos only; skip for talking-head |
 | 7. HTML | Deep only | Single-page with export toolbar |
 | 8. Verify | Deep only | Chrome headless screenshot + visual check |
 
-**Failsafe**: If Phase 3 (transcription) fails at all 5 tiers (cloud Doubao + TeleSpeechASR +
-SenseVoiceSmall + local FunASR + local Whisper), fall back to embedded subtitles from `--write-subs`
-(Phase 1). Extract SRT directly from the video file:
+**Failsafe**: In `engine=auto`, platform subtitles are tried before ASR. If all
+four transcription engines fail, report the last classified error and keep the
+download trace; embedded subtitles may still be extracted from a local video:
 ```bash
 ffmpeg -i video.mp4 -map 0:s:0 output.srt
 ```
@@ -143,48 +143,38 @@ parallelizes the slowest phase (download is real-time for MediaRecorder).
 **DO NOT parallelize within a single video** — transcription depends on audio,
 which depends on download. But different videos are independent.
 
-### ⏱️ Time Estimates (per video, single-threaded)
+### ⏱️ Time Estimates
 
-| Video Length | Download (MediaRecorder) | Audio Extract | Transcribe (TeleSpeechASR) | Total |
-|-------------|--------------------------|---------------|---------------------------|-------|
-| 1 min | ~60s | ~3s | ~5s | **~70s** |
-| 3 min | ~180s | ~5s | ~8s | **~195s** |
-| 10 min | ~600s | ~10s | ~15s | **~625s** |
-
-With parallel batch processing (N videos): ~60s + N × 8s (transcription overlaps download).
+Public DASH/SSR downloads are normally faster than real time; cloud and local ASR
+times vary by provider, CPU/GPU, and model. Only the final MediaRecorder fallback
+is expected to take approximately the video duration. Do not promise fixed timing.
 
 ---
 
-## Phase 1: Download Video with Full Metadata
+## Phase 1: Acquire the Smallest Required Media
 
-Use `yt-dlp` with cookies for platforms that require authentication (Bilibili
-logged-in quality, etc.).
+Call `run_transcribe_pipeline()` for normal work. It first asks for platform
+subtitles, then acquires a validated audio asset for Bilibili/Douyin. It does
+not download a full video merely to transcribe speech. Use `download_video()`
+only when the user asked for the video file or when a generic platform has no
+audio-first route.
 
-### Command Template
+For acquisition-only diagnostics, use the same implementation as the Web UI:
 
 ```bash
-yt-dlp \
-  --cookies-from-browser chrome \
-  --add-header "Referer:https://www.xiaohongshu.com/" \  # required for Xiaohongshu
-  --write-info-json \
-  --write-thumbnail \
-  --write-subs \
-  --sub-langs all \
-  --embed-metadata \
-  --output "%(title).200s-%(id)s.%(ext)s" \
-  "<VIDEO_URL>"
+python scripts/acquire_media.py "<URL_OR_SHARE_TEXT>" --output-dir output/smoke --purpose audio
 ```
 
 ### Key requirements
 
-- **Cookies**: Use `--cookies-from-browser chrome` (or `firefox`/`edge`). If
-  that fails, fall back to `--cookies /path/to/cookies.txt`.
-- **Metadata**: The `--write-info-json` flag produces a `.info.json` file
-  containing title, uploader, description, tags, duration, chapters, and
-  multi-part (分P) info. Parse this file to extract all metadata.
-- **Platform-specific**: For Bilibili, add `--parse-metadata "description:%(description)s"`.
-  For Douyin and Xiaohongshu, cookies are mandatory.
-- **Output naming**: Keep the video ID in the filename for traceability.
+- **No implicit browser state**: do not read live Chrome by default. Public
+  Bilibili/Douyin routes are anonymous; configure Cookie input only when needed.
+- **Media validation**: every success must pass ffprobe for required streams,
+  positive duration, minimum size, and duration tolerance when metadata exists.
+- **Classified fallback**: 412 is not retried identically; signed 403/410 is
+  refreshed once; then switch to a route with a different failure mode.
+- **Traceability**: `raw/download.trace.json` records strategy and timing without
+  URL queries, cookies, API keys, or signed CDN URLs.
 
 After download, read the `.info.json` file and extract:
 - `title` — video title
@@ -202,6 +192,9 @@ After download, read the `.info.json` file and extract:
 
 Extract audio directly as MP3 in one step (skip WAV intermediate). Validate
 duration against ffprobe (no metadata JSON needed for most platforms).
+
+Bilibili/Douyin audio-first routes already return a validated audio asset and
+skip this extraction step. Run it only when Phase 1 produced a full video.
 
 ### Step 1: Extract Audio (One-Step)
 
@@ -256,13 +249,12 @@ cloud API if a key is configured.
 
 ### Mode A: Cloud API (Recommended)
 
-Fast, no local compute, no model download. Three providers (豆包首选，TeleSpeechASR 兜底)：
+Fast, no local compute, no model download. Two providers (豆包首选，TeleSpeechASR 兜底)：
 
 | Priority | Provider | Register / 获取 Key | Model | Notes |
 |----------|----------|----------|-------|-------|
 | **1st** | 豆包(火山引擎) | https://console.volcengine.com/speech/new/setting/apikeys | bigmodel 2.0 | 中文最准(实测 78% vs TeleSpeechASR 22%)、自带标点+ITN+词级时间戳；异步 submit+query（**首选**） |
 | **2nd** | 硅基流动 | https://siliconflow.cn | TeleSpeechASR | 已验证稳定、sync API、no emoji（兜底） |
-| **3rd** | 硅基流动 | https://siliconflow.cn | SenseVoiceSmall | Has emoji noise, post-process required |
 
 #### 2nd: 硅基流动 TeleSpeechASR（云端兜底，已验证）
 
@@ -335,20 +327,7 @@ for i, seg in enumerate(result["segments"], 1):
     # Format as SRT entry
 ```
 
-**SenseVoiceSmall emoji issue**: The `FunAudioLLM/SenseVoiceSmall` model
-outputs emoji for audio events and emotions (🎼=BGM, 😡=angry, 😊=happy).
-SiliconFlow's API does not expose a `use_emoji` parameter to disable this.
-**Always post-process** SenseVoiceSmall output with `emoji.replace_emoji()`:
-
-```python
-from emoji import replace_emoji
-cleaned = replace_emoji(raw_text, replace="")
-```
-
-**Recommendation**: Prefer `TeleAI/TeleSpeechASR` for Chinese — it has better
-accuracy AND doesn't output emoji. Only use SenseVoiceSmall for comparison.
-
-**API key storage** (cross-Agent, 3 sources checked in priority order):
+**API key storage** (2 explicit sources checked in priority order):
 
 1. **Environment variable** `SILICONFLOW_API_KEY` (recommended, works in any Agent)
    ```bash
@@ -358,8 +337,6 @@ accuracy AND doesn't output emoji. Only use SenseVoiceSmall for comparison.
    ```json
    {"siliconflow_api_key": "sk-xxxxx"}
    ```
-3. **WorkBuddy legacy** `~/.workbuddy/MEMORY.md` (auto-detected for backward compatibility)
-
 Scripts source `scripts/load_config.sh` to load the key from any of these sources.
 If not found, go back to First-Run Guide → Transcription Setup Flow.
 
@@ -369,13 +346,11 @@ If not found, go back to First-Run Guide → Transcription Setup Flow.
    Async submit+query, base64 inline audio. Needs `DOUBAO_API_KEY`.
 2. **TeleSpeechASR** (cloud) — fallback. Proven stable, sync API, no emoji noise.
    Needs `SILICONFLOW_API_KEY`.
-3. **SenseVoiceSmall** (cloud) — alternative for A/B comparison. Always post-process
-   with `emoji.replace_emoji()` to strip emoji.
-4. **Local FunASR / Paraformer** — preferred offline engine. Faster + more accurate
+3. **Local FunASR / Paraformer** — preferred offline engine. Faster + more accurate
    for Chinese than Whisper, with built-in VAD + punctuation + ITN. Use when no
    API key, no network, or quota exhausted. Implemented in `webui/pipeline.py`
    (`_transcribe_funasr`), auto-selects `cuda`/`cpu`.
-5. **Local Whisper** — last resort. Only when FunASR is unavailable or content is
+4. **Local Whisper** — last resort. Only when FunASR is unavailable or content is
    non-Chinese (Whisper has broader language coverage). Implemented in
    `_transcribe_whisper`.
 
@@ -872,24 +847,22 @@ Correction rules for Chinese transcription:
 
 ### Bilibili (B站)
 
-- Requires cookies for 1080p+ quality. Use `--cookies-from-browser chrome`.
-- Multi-part videos (分P): `yt-dlp` downloads all parts by default. Use
-  `--playlist-items 1` to download a specific part.
-- Subtitles (弹幕 / AI字幕) — **字幕优先**：Phase 1 的 `--write-subs --sub-langs all` 会
-  **自动下载 B站平台生成的 AI 字幕**（`ai-zh`/`ai-en`/`ai-ja` 等多语种 .srt）。
-  `run_transcribe_pipeline` 在 `engine=auto` 时**优先用 `ai-zh.srt` 直接当文稿、跳过 ASR**
-  （秒级、免额度），无字幕才走豆包等 ASR。手动指定 engine（doubao/tele/…）则强制 ASR。
-  `_try_subtitle_transcript()` 扫 raw/ 找 ai-zh 优先、其次任意 .srt；`_parse_srt_to_transcript()` 解析。
-  注意：**不是所有 B站视频都有 AI 字幕**（仅平台已生成的才有）；抖音 iesdouyin 不提供字幕。
+- **转文稿**：`engine=auto` 先尝试平台 SRT；无字幕时走公共 DASH 音轨，
+  仅当公共 API 不适用时才用 yt-dlp `bestaudio`。
+- **纯视频**：显式 Cookie yt-dlp（登录画质）→ 匿名公共 DASH 音视频合并 →
+  yt-dlp 匿名兜底。公开内容通常不需要 Cookie。
+- HTTP 412 是当前请求被风控拒绝时的常见表现；记录分类错误后切换公共 API，
+  不原样盲重试。浏览器已登录不等于 Python 进程自动获得 Cookie。
 
-### Douyin (抖音) — iesdouyin 无 Cookie 首选
+### Douyin (抖音)
 
-抖音对未登录态返回 403。**首选 iesdouyin 分享接口（无需 cookie/登录/yt-dlp）**，
-失败再退 yt-dlp(带 cookie)/Playwright。参考实现：chubbyguan/chubbyskills。
+转文稿默认走：隔离 Playwright 签名音轨 → 移动 SSR MP4 提取音频 → 显式
+Cookie yt-dlp → MediaRecorder。纯视频默认走：移动 SSR MP4 → 隔离
+Playwright DASH → 显式 Cookie yt-dlp → MediaRecorder。浏览器登录态不会被隐式读取。
 
-#### ✅ Tier 1: iesdouyin 分享接口（首选，无 cookie）
+#### 移动 SSR 分享接口（纯视频首选、转录第二路径）
 
-`webui/pipeline.py` 的 `_download_douyin_iesdouyin()` 已实现：
+`webui/douyin.py` 的 `acquire_muxed()` 已实现：
 1. 提取 video id（短链跟重定向，`/video/(\d+)`）
 2. 抓 `https://www.iesdouyin.com/share/video/<id>`（**移动端 iPhone UA**）
 3. 正则提取 `window._ROUTER_DATA` → `loaderData["video_(id)/page"]["videoInfoRes"]["item_list"][0]`
@@ -905,7 +878,7 @@ curl -s -L -o video.mp4 -H "User-Agent: <iPhone UA>" -H "Referer: https://www.do
 
 实测：两个抖音视频（2:13 / 10:41）均一次成功，下载的视频**带音轨**，配合豆包转录 11.7s / 55.6s 出文稿。
 
-#### 兜底（iesdouyin 失败时才用）
+#### v0.5 历史手动兜底说明（v0.7 Web pipeline 不执行以下命令）
 
 抖音反爬强，下列方法需要 cookie 或浏览器自动化，作为 iesdouyin 失败后的退路：
 
@@ -919,7 +892,7 @@ curl -s -L -o video.mp4 -H "User-Agent: <iPhone UA>" -H "Referer: https://www.do
 4. **Detect captcha early.** If page title contains "验证码", abort immediately and
    retry with a fresh session after 30s delay.
 
-#### Download Strategy — 兜底链路（iesdouyin 失败后，按可靠性排序）
+#### 历史手动 Download Strategy（仅供排障背景，不代表当前顺序）
 
 **Tier 2: MediaRecorder (most reliable, ~video_duration seconds)**
 
@@ -1029,7 +1002,8 @@ Only try if both Tier 1 and Tier 2 fail. Known failure: "Fresh cookies needed",
   `_download_xhs_initial_state()` 已实现：移动端 iPhone UA + Referer，括号配平提取
   `window.__INITIAL_STATE__`，递归定位 note，从 `video.media.stream.{h264,h265,h266,av1}[].masterUrl`
   提直链下载。可选 `XHS_COOKIE` 环境变量提高成功率（风控严时需要）。参考 chubbyguan/chubbyskills。
-- **兜底：yt-dlp + cookie**——`__INITIAL_STATE__` 失败才走，需 `--cookies-from-browser chrome` 或 cookies.txt。
+- **兜底：yt-dlp + cookie**——`__INITIAL_STATE__` 失败才走；优先使用显式配置的 cookies.txt，
+  不要默认读取正在运行的 Chrome。
 - **Referer header is critical**: always add `--add-header "Referer:https://www.xiaohongshu.com/"`.
 - **M3U8 streams**: Some Xiaohongshu videos use HLS/M3U8；yt-dlp 原生支持，可加 `--concurrent-fragments 5`。
 - **风控检测**：响应含「请通过小红书」或 `verify` 即被拦，提示设 `XHS_COOKIE`。
@@ -1049,12 +1023,11 @@ Only try if both Tier 1 and Tier 2 fail. Known failure: "Fresh cookies needed",
 |------|---------|----------|
 | `yt-dlp` | Video download | Always |
 | `ffmpeg` + `ffprobe` | Audio/video processing | Always |
-| `emoji` (Python) | SenseVoiceSmall text cleanup | If using SenseVoiceSmall |
 | 豆包(火山) API Key | Cloud transcription (preferred, bigmodel 2.0) | Cloud mode |
 | 硅基流动 API Key | Cloud transcription (fallback) | Cloud mode |
 | `funasr` | Local transcription (preferred offline, Chinese) | Offline mode |
 | `openai-whisper` | Local transcription (last resort, multilingual) | Offline fallback |
-| Playwright CLI | Douyin/XHS video URL extraction | Douyin/XHS scenarios |
+| Python Playwright | Douyin signed media capture and MediaRecorder fallback | Douyin scenarios |
 | Chrome/Chromium | Headless verification | Optional (deep analysis mode) |
 
 One-command check:
@@ -1062,7 +1035,7 @@ One-command check:
 bash scripts/check_setup.sh
 ```
 
-For cloud API, source `scripts/load_config.sh` (env var → ~/.video2doc/config.json → WorkBuddy legacy).
+For cloud API, source `scripts/load_config.sh` (environment variable → `~/.video2doc/config.json`).
 
 ---
 

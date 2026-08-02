@@ -4,6 +4,36 @@
 
 暂无。
 
+## [v0.7.0] — 2026-08-02
+
+### Added
+- B站公共 API 采集器：转文稿默认直接下载公开 DASH 音轨，纯下载使用独立音视频轨并经 ffmpeg 合并；yt-dlp 保留为字幕、登录画质和兼容兜底。
+- 抖音分层采集器：移动分享 MP4、隔离 Playwright 会话捕获签名 DASH 音轨、显式 Cookie yt-dlp 与 MediaRecorder 组成不同原理的回退链。
+- `download.trace.json` 记录每次策略、耗时、分类错误及媒体校验结果，同时移除查询参数、Cookie、API Key 和签名 URL。
+- `scripts/acquire_media.py` 提供与 Web UI 完全相同的 B站/抖音媒体采集入口。
+- Whisper 模型可通过 `VIDEO2DOC_WHISPER_MODEL` 或 `whisper_model` 显式选择；默认仍为 `turbo`。
+
+### Security
+- 默认不再读取正在运行的 Chrome Cookie 数据库；登录能力必须显式配置 `cookies.txt`、浏览器源或抖音 Playwright `storage_state`。
+- 抖音浏览器状态只在隔离浏览器上下文使用，不会把 Cookie 扁平化后转发给第三方 CDN；CDN 仅使用捕获的签名 URL 与 Referer。
+
+### Changed
+- 在线转文稿改为“字幕优先 → 平台音频直取 → ASR”，B站和抖音不再为了识别语音先下载完整视频。
+- B站字幕 HTTP 412 不再原样盲重试；立即切换公共音轨。抖音签名 URL 的 403/410 只刷新一次页面签名，再进入不同原理的后备路径。
+- 保留 v0.6.0 的豆包、TeleSpeechASR、FunASR、Whisper、多格式导出、隐私模式和 Web 安全能力；平台元数据标题与时长不再被转录首句覆盖。
+- Windows 配置统一按 UTF-8 BOM/UTF-8 读取，并兼容旧 GB18030 配置，无需依赖系统“UTF-8 Beta”区域设置。
+
+### Fixed
+- 转录全部失败时保留最后一个引擎的可执行错误信息，避免只显示笼统的“所有引擎失败”。
+- 发布构建器在 Git worktree 中正确排除文件形式的 `.git` 元数据。
+- yt-dlp 固定使用 `--ignore-config` 和唯一输出名，避免用户全局配置、缩略图或上一次残留文件被误判为成功媒体。
+
+### Verification
+- 71/71 Python 回归测试通过，并通过 Python、JavaScript、Shell 语法检查与 `git diff --check`。
+- Windows 真实 B站全流程：字幕请求 412 后切 `bilibili.public_api_audio`，完成 Whisper 转录及 MD/TXT/JSON/SRT 导出。
+- Windows 真实抖音全流程：签名音轨页面超时后切 `douyin.mobile_ssr_mp4`，完成 Whisper 转录及 MD/TXT/JSON/SRT 导出。
+- 两个真实样本均经 ffprobe 校验音轨、时长和文件完整性；平台页面与风控会变化，不构成永久成功率承诺。
+
 ## [v0.6.0] — 2026-07-22
 
 ### Security

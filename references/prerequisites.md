@@ -9,8 +9,8 @@ Run this check before starting any video analysis.
 | yt-dlp | any recent | `yt-dlp --version` | `brew install yt-dlp` or `pip install yt-dlp` |
 | ffmpeg | 4.0+ | `ffmpeg -version` | `brew install ffmpeg` |
 | ffprobe | (bundled with ffmpeg) | `ffprobe -version` | (comes with ffmpeg) |
-| whisper | any recent | `whisper --help` | `pip install openai-whisper` |
-| Chrome | any recent | `ls /Applications/Google\ Chrome.app` | Download from google.com |
+| whisper | any recent | `python -c "import whisper"` | `pip install openai-whisper` |
+| Python Playwright | any recent | `python -c "import playwright"` | `pip install playwright` |
 
 ## Quick Check
 
@@ -23,16 +23,18 @@ echo -n "whisper: "; which whisper && whisper --help | head -1 || echo "NOT FOUN
 echo -n "Chrome:  "; ls /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome 2>/dev/null && echo "FOUND" || echo "NOT FOUND"
 ```
 
-## Cookie Setup
+## Optional Login State
 
-For Bilibili and Douyin, cookies are often required for full quality:
+Public Bilibili and Douyin routes normally work without cookies. For logged-in
+quality or restricted content:
 
 1. Log into the platform in Chrome
-2. Use `--cookies-from-browser chrome` with yt-dlp
-3. If that fails, export cookies manually:
-   - Install a browser extension like "Get cookies.txt"
-   - Export to `cookies.txt`
-   - Use `--cookies cookies.txt`
+2. Export a Netscape-format `cookies.txt`, then configure
+   `VIDEO2DOC_BILIBILI_COOKIES_FILE` or `VIDEO2DOC_DOUYIN_COOKIES_FILE`
+3. For Douyin Playwright, optionally configure
+   `VIDEO2DOC_DOUYIN_STORAGE_STATE` with an explicitly exported state file
+
+Video2Doc never reads the live Chrome cookie database implicitly.
 
 ## Storage Requirements
 
