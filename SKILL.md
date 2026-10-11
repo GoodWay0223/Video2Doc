@@ -153,11 +153,12 @@ is expected to take approximately the video duration. Do not promise fixed timin
 
 ## Phase 1: Acquire the Smallest Required Media
 
-Call `run_transcribe_pipeline()` for normal work. It first asks for platform
-subtitles, then acquires a validated audio asset for Bilibili/Douyin. It does
-not download a full video merely to transcribe speech. Use `download_video()`
-only when the user asked for the video file or when a generic platform has no
-audio-first route.
+Run `python video2doc.py "<URL_OR_SHARE_TEXT>"` (or call
+`run_transcribe_pipeline()`) for normal work. It first asks for platform
+subtitles (Bilibili/YouTube), then acquires the smallest validated audio asset
+(Bilibili DASH audio, Douyin share MP4/signed audio, YouTube audio-only). It
+does not download a full video merely to transcribe speech. Use
+`--download` / `download_video()` only when the user asked for the video file.
 
 For acquisition-only diagnostics, use the same implementation as the Web UI:
 
@@ -312,7 +313,7 @@ curl -L -X POST 'https://openspeech.bytedance.com/api/v3/auc/bigmodel/query' \
 ```
 
 `webui/pipeline.py` 的 `_transcribe_doubao()` 已封装（用 urllib 而非 curl）：
-重采样→base64→submit→按响应头状态码轮询(最多 ~90s)→归一化 `{text, segments}`(ms→s)。
+统一 16k 单声道 MP3→base64→submit→按响应头状态码轮询(时限随音频时长伸缩，至少 3 分钟)→归一化 `{text, segments}`(ms→s)。
 实测 6:43 音频 ~35s 完成，中文同音字识别优于 TeleSpeechASR。
 
 The `verbose_json` response includes segment-level timestamps (`segments[].start`,
@@ -856,11 +857,11 @@ Correction rules for Chinese transcription:
 
 ### Douyin (抖音)
 
-转文稿默认走：隔离 Playwright 签名音轨 → 移动 SSR MP4 提取音频 → 显式
+转文稿默认走：移动 SSR MP4（免浏览器）→ 隔离 Playwright 签名音轨 → 显式
 Cookie yt-dlp → MediaRecorder。纯视频默认走：移动 SSR MP4 → 隔离
 Playwright DASH → 显式 Cookie yt-dlp → MediaRecorder。浏览器登录态不会被隐式读取。
 
-#### 移动 SSR 分享接口（纯视频首选、转录第二路径）
+#### 移动 SSR 分享接口（纯视频与转录的首选路径）
 
 `webui/douyin.py` 的 `acquire_muxed()` 已实现：
 1. 提取 video id（短链跟重定向，`/video/(\d+)`）
@@ -878,7 +879,7 @@ curl -s -L -o video.mp4 -H "User-Agent: <iPhone UA>" -H "Referer: https://www.do
 
 实测：两个抖音视频（2:13 / 10:41）均一次成功，下载的视频**带音轨**，配合豆包转录 11.7s / 55.6s 出文稿。
 
-#### v0.5 历史手动兜底说明（v0.7 Web pipeline 不执行以下命令）
+#### v0.5 历史手动兜底说明（当前 pipeline 不执行以下命令）
 
 抖音反爬强，下列方法需要 cookie 或浏览器自动化，作为 iesdouyin 失败后的退路：
 
@@ -1041,20 +1042,25 @@ For cloud API, source `scripts/load_config.sh` (environment variable → `~/.vid
 
 ## CLI & Scripts
 
-### Entry Point: `video2doc.sh`
+### Entry Point: `video2doc.py`
+
+The CLI runs exactly the same pipeline as the Web UI (subtitle-first, direct
+platform audio, engine fallback, privacy mode, multi-format export). Prefer it
+over hand-written download/ASR commands; `./video2doc.sh` is an equivalent
+Bash wrapper.
 
 ```bash
-# Single video → transcript
-./video2doc.sh "https://v.douyin.com/xxxx"
+# Link or pasted share text → transcript (output/<job id>/transcript.md)
+python video2doc.py "https://v.douyin.com/xxxx"
 
-# Batch mode (one link per line in links.txt)
-./video2doc.sh --batch links.txt --format srt,md
+# Batch mode (one link or local file per line in links.txt)
+python video2doc.py --batch links.txt --format srt,md
 
-# With domain corrections applied automatically
-./video2doc.sh --domain auto "https://v.douyin.com/xxxx" --format all
+# Local file, on-device ASR only (FunASR/Whisper; no cloud calls)
+python video2doc.py meeting.m4a --local-only --format all
 
-# Dry-run (check what would happen)
-./video2doc.sh --dry-run --batch links.txt
+# Download the video only; machine-readable result on stdout
+python video2doc.py --download "https://youtu.be/xxxx" --json
 ```
 
 ### Utility Scripts

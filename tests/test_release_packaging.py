@@ -3,6 +3,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 import unittest
 import uuid
 import zipfile
@@ -22,7 +23,12 @@ class ReleasePackagingTests(unittest.TestCase):
         self.temp_dir.mkdir()
 
     def tearDown(self):
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        # Windows antivirus/indexers can briefly lock freshly extracted files.
+        for _ in range(10):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+            if not self.temp_dir.exists():
+                return
+            time.sleep(0.2)
 
     def test_archive_is_safe_cross_platform_and_runnable(self):
         output = self.temp_dir / "dist"

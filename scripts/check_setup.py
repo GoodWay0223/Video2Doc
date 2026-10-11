@@ -17,9 +17,9 @@ import urllib.request
 from pathlib import Path
 
 try:
-    from .platform_utils import find_executable
+    from .platform_utils import find_executable, load_user_config
 except ImportError:  # Direct execution: python scripts/check_setup.py
-    from platform_utils import find_executable
+    from platform_utils import find_executable, load_user_config
 
 MIN_PYTHON = (3, 10)
 REQUIREMENTS_PATH = Path(__file__).resolve().parents[1] / 'requirements.txt'
@@ -197,13 +197,7 @@ def _fetch_latest_ytdlp_version():
 
 
 def _load_config():
-    cfg = Path.home() / '.video2doc' / 'config.json'
-    if not cfg.exists():
-        return {}
-    try:
-        return json.loads(cfg.read_text(encoding='utf-8'))
-    except (OSError, ValueError, TypeError):
-        return {}
+    return load_user_config()
 
 
 def _get_siliconflow_key(config):

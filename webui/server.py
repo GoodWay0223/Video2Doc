@@ -1,21 +1,25 @@
 """HTTP Server: request handler, routing, and request-boundary validation."""
 import http.server
 import json
-import os
 import re
-import threading
+import shutil
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
-from . import job_manager, pipeline, templates
+from . import __version__, job_manager, pipeline, templates
 
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 MAX_JSON_BODY_BYTES = 64 * 1024
-MAX_UPLOAD_FILE_BYTES = 200 * 1024 * 1024
+# Raw (application/octet-stream) uploads are streamed straight to disk, so the
+# limit is about disk use, not memory. Legacy multipart uploads are parsed in
+# memory and keep the smaller historical limit.
+MAX_UPLOAD_FILE_BYTES = 4 * 1024 * 1024 * 1024
+MAX_MULTIPART_FILE_BYTES = 200 * 1024 * 1024
 # Multipart headers and boundaries add a small amount beyond the file itself.
-MAX_UPLOAD_BODY_BYTES = MAX_UPLOAD_FILE_BYTES + 1024 * 1024
+MAX_UPLOAD_BODY_BYTES = MAX_MULTIPART_FILE_BYTES + 1024 * 1024
 STREAM_CHUNK_SIZE = 1024 * 1024
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 ALLOWED_PLATFORM_DOMAINS = (
     "douyin.com",
@@ -95,6 +99,8 @@ def get_public_capabilities(*, check_updates=False):
         "whisper": ready("whisper"),
     }
     return {
+        "version": __version__,
+        "max_upload_bytes": MAX_UPLOAD_FILE_BYTES,
         "download_tools_ready": (
             ready("ffmpeg") and ready("ffprobe")
             and ready("curl") and ready("yt_dlp")
@@ -228,9 +234,49 @@ def upload_storage_name(original_filename):
     return "uploaded-media" + suffix
 
 
+def _split_host(value):
+    """Return the lowercase hostname from a Host/Origin authority."""
+    value = (value or "").strip().lower()
+    if value.startswith("["):
+        return value[1:value.find("]")] if "]" in value else value
+    return value.rsplit(":", 1)[0] if value.count(":") == 1 else value
+
+
+def allowed_hosts_for(bind_host):
+    """Hosts accepted in the Host header; None means any (explicit LAN mode)."""
+    bind_host = (bind_host or "").strip().lower().strip("[]")
+    if bind_host in {"", "0.0.0.0", "::"}:
+        return None
+    return LOOPBACK_HOSTS | {bind_host}
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
+    # Configured by webui.py. Rejecting unknown Host headers blocks DNS
+    # rebinding: a malicious page cannot read this loopback API via its own name.
+    allowed_hosts = frozenset(LOOPBACK_HOSTS)
+
     def log_message(self, format, *args):
         pass
+
+    def _request_allowed(self, *, state_changing=False):
+        host_header = self.headers.get("Host")
+        allowed = self.allowed_hosts
+        if host_header and allowed is not None and _split_host(host_header) not in allowed:
+            self._send_json({"error": "不允许的 Host"}, 403)
+            return False
+        if state_changing:
+            # Browsers always attach Origin / Sec-Fetch-Site to cross-site POSTs,
+            # so this rejects CSRF from other websites without breaking the UI.
+            origin = self.headers.get("Origin")
+            if origin and origin != "null":
+                origin_authority = urlparse(origin).netloc.lower()
+                if not host_header or origin_authority != host_header.strip().lower():
+                    self._send_json({"error": "拒绝跨站请求"}, 403)
+                    return False
+            elif origin == "null" or self.headers.get("Sec-Fetch-Site") == "cross-site":
+                self._send_json({"error": "拒绝跨站请求"}, 403)
+                return False
+        return True
 
     def _send_json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -262,13 +308,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Disposition", f'attachment; filename="{download_name}"')
             self.send_header("Content-Length", str(file_size))
             self.end_headers()
-            while True:
-                chunk = source.read(STREAM_CHUNK_SIZE)
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
+            try:
+                shutil.copyfileobj(source, self.wfile, STREAM_CHUNK_SIZE)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass  # The browser cancelled the download.
 
-    def _read_body(self, max_bytes):
+    def _content_length(self, max_bytes):
         transfer_encoding = self.headers.get("Transfer-Encoding", "").strip().lower()
         if transfer_encoding and transfer_encoding != "identity":
             raise RequestValidationError("不支持 Transfer-Encoding 请求体")
@@ -284,7 +329,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             raise RequestValidationError("Content-Length 无效")
         if length > max_bytes:
             raise RequestValidationError("请求体过大", 413)
+        return length
 
+    def _read_body(self, max_bytes):
+        length = self._content_length(max_bytes)
         body = self.rfile.read(length)
         if len(body) != length:
             raise RequestValidationError("请求体不完整")
@@ -302,6 +350,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     # ─── GET ───────────────────────────────
     def do_GET(self):
+        if not self._request_allowed():
+            return
         parsed = urlparse(self.path)
         path = parsed.path
 
@@ -310,6 +360,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(html)))
             self.end_headers()
             self.wfile.write(html)
@@ -375,6 +428,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     # ─── POST ──────────────────────────────
     def do_POST(self):
+        if not self._request_allowed(state_changing=True):
+            return
         try:
             self._handle_post()
         except RequestValidationError as exc:
@@ -410,7 +465,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 allow_enrichment=allow_enrichment,
             )
             job_manager.add_job(job)
-            threading.Thread(target=pipeline.run_transcribe_pipeline, args=(job,), daemon=True).start()
+            job_manager.submit(job, pipeline.run_transcribe_pipeline)
             self._send_json({"job_id": job.id, "status": "queued"})
             return
 
@@ -434,7 +489,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 target = pipeline.run_transcribe_pipeline
             else:
                 target = pipeline.run_download_pipeline
-            threading.Thread(target=target, args=(job,), daemon=True).start()
+            job_manager.submit(job, target)
             self._send_json({"job_id": job.id, "status": "queued"})
             return
 
@@ -445,61 +500,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send_json({"error": "未找到"}, 404)
 
     def _handle_local_upload(self):
-        content_type = self.headers.get("Content-Type", "")
-        if "multipart/form-data" not in content_type.lower():
-            raise RequestValidationError("需要 multipart/form-data")
+        content_type = self.headers.get("Content-Type", "").lower()
+        if content_type.startswith("application/octet-stream"):
+            self._handle_raw_upload()
+        elif "multipart/form-data" in content_type:
+            self._handle_multipart_upload()
+        else:
+            raise RequestValidationError("需要 application/octet-stream 或 multipart/form-data")
 
-        boundary = None
-        for item in content_type.split(";"):
-            item = item.strip()
-            if item.lower().startswith("boundary="):
-                boundary = item.split("=", 1)[1].strip().strip('"')
-                break
-        if not boundary or len(boundary) > 200 or "\r" in boundary or "\n" in boundary:
-            raise RequestValidationError("缺少或无效 boundary")
-        try:
-            boundary_bytes = boundary.encode("ascii")
-        except UnicodeEncodeError:
-            raise RequestValidationError("boundary 必须为 ASCII") from None
-
-        body = self._read_body(MAX_UPLOAD_BODY_BYTES)
-        parts = body.split(b"--" + boundary_bytes)
-        file_data = None
-        original_filename = None
-        formats_value = "md"
-        engine_value = "auto"
-        local_only_value = "false"
-        allow_enrichment_value = "true"
-
-        for part in parts:
-            separator = b"\r\n\r\n" if b"\r\n\r\n" in part else b"\n\n"
-            if separator not in part:
-                continue
-            header_section, content = part.split(separator, 1)
-            if content.endswith(b"\r\n"):
-                content = content[:-2]
-            elif content.endswith(b"\n"):
-                content = content[:-1]
-            header_string = header_section.decode("iso-8859-1", errors="replace")
-
-            filename_match = re.search(r'filename="([^"]*)"', header_string, re.IGNORECASE)
-            if filename_match:
-                original_filename = filename_match.group(1)
-                file_data = content
-            elif re.search(r'name="formats"', header_string, re.IGNORECASE):
-                formats_value = content.decode("utf-8", errors="replace").strip()
-            elif re.search(r'name="engine"', header_string, re.IGNORECASE):
-                engine_value = content.decode("utf-8", errors="replace").strip()
-            elif re.search(r'name="local_only"', header_string, re.IGNORECASE):
-                local_only_value = content.decode("utf-8", errors="replace").strip()
-            elif re.search(r'name="allow_enrichment"', header_string, re.IGNORECASE):
-                allow_enrichment_value = content.decode("utf-8", errors="replace").strip()
-
-        if file_data is None or original_filename is None or not file_data:
-            raise RequestValidationError("未收到文件")
-        if len(file_data) > MAX_UPLOAD_FILE_BYTES:
-            raise RequestValidationError("文件超过 200MB 限制", 413)
-
+    def _create_local_job(self, original_filename, formats_value, engine_value,
+                          local_only_value, allow_enrichment_value):
         formats = parse_formats(formats_value)
         engine = validate_engine(engine_value)
         local_only = parse_bool(local_only_value, "local_only", False)
@@ -520,8 +530,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             allow_enrichment=allow_enrichment,
         )
         job.local_filename = display_filename
-        job.local_filesize = len(file_data)
-        job_manager.add_job(job)
 
         job_root = job.dir.resolve()
         raw_dir = (job_root / "raw").resolve()
@@ -535,10 +543,97 @@ class Handler(http.server.BaseHTTPRequestHandler):
             file_path.relative_to(raw_dir)
         except ValueError:
             raise RequestValidationError("上传文件路径无效", 500) from None
-        file_path.write_bytes(file_data)
+        return job, file_path
 
-        threading.Thread(target=pipeline.run_local_pipeline, args=(job, str(file_path)), daemon=True).start()
+    def _start_local_job(self, job, file_path, size):
+        job.local_filesize = size
+        job_manager.add_job(job)
+        job_manager.submit(job, pipeline.run_local_pipeline, str(file_path))
         self._send_json({"job_id": job.id, "status": "queued"})
+
+    def _handle_raw_upload(self):
+        """Stream the request body to disk: memory use stays constant for any size."""
+        query = parse_qs(urlparse(self.path).query)
+
+        def field(name, default):
+            values = query.get(name)
+            return values[-1] if values else default
+
+        length = self._content_length(MAX_UPLOAD_FILE_BYTES)
+        if length == 0:
+            raise RequestValidationError("未收到文件")
+        job, file_path = self._create_local_job(
+            field("filename", ""), field("formats", "md"), field("engine", "auto"),
+            field("local_only", "false"), field("allow_enrichment", "true"))
+        partial = file_path.with_name(file_path.name + ".part")
+        remaining = length
+        try:
+            with partial.open("wb") as output:
+                while remaining:
+                    chunk = self.rfile.read(min(STREAM_CHUNK_SIZE, remaining))
+                    if not chunk:
+                        raise RequestValidationError("请求体不完整")
+                    output.write(chunk)
+                    remaining -= len(chunk)
+            partial.replace(file_path)
+        except BaseException:
+            # Only the directory created for this request is removed.
+            shutil.rmtree(job.dir, ignore_errors=True)
+            raise
+        self._start_local_job(job, file_path, length)
+
+    def _handle_multipart_upload(self):
+        content_type = self.headers.get("Content-Type", "")
+        boundary = None
+        for item in content_type.split(";"):
+            item = item.strip()
+            if item.lower().startswith("boundary="):
+                boundary = item.split("=", 1)[1].strip().strip('"')
+                break
+        if not boundary or len(boundary) > 200 or "\r" in boundary or "\n" in boundary:
+            raise RequestValidationError("缺少或无效 boundary")
+        try:
+            boundary_bytes = boundary.encode("ascii")
+        except UnicodeEncodeError:
+            raise RequestValidationError("boundary 必须为 ASCII") from None
+
+        body = self._read_body(MAX_UPLOAD_BODY_BYTES)
+        parts = body.split(b"--" + boundary_bytes)
+        file_data = None
+        original_filename = None
+        fields = {"formats": "md", "engine": "auto",
+                  "local_only": "false", "allow_enrichment": "true"}
+
+        for part in parts:
+            separator = b"\r\n\r\n" if b"\r\n\r\n" in part else b"\n\n"
+            if separator not in part:
+                continue
+            header_section, content = part.split(separator, 1)
+            if content.endswith(b"\r\n"):
+                content = content[:-2]
+            elif content.endswith(b"\n"):
+                content = content[:-1]
+            header_string = header_section.decode("iso-8859-1", errors="replace")
+
+            filename_match = re.search(r'filename="([^"]*)"', header_string, re.IGNORECASE)
+            if filename_match:
+                original_filename = filename_match.group(1)
+                file_data = content
+                continue
+            name_match = re.search(r'name="([^"]*)"', header_string, re.IGNORECASE)
+            if name_match and name_match.group(1) in fields:
+                fields[name_match.group(1)] = content.decode("utf-8", errors="replace").strip()
+
+        if file_data is None or original_filename is None or not file_data:
+            raise RequestValidationError("未收到文件")
+        if len(file_data) > MAX_MULTIPART_FILE_BYTES:
+            raise RequestValidationError("multipart 上传超过 200MB 限制", 413)
+
+        job, file_path = self._create_local_job(
+            original_filename, fields["formats"], fields["engine"],
+            fields["local_only"], fields["allow_enrichment"])
+        file_path.write_bytes(file_data)
+        self._start_local_job(job, file_path, len(file_data))
 
     def do_OPTIONS(self):
         # Same-origin API: retain a standards-compliant response without enabling CORS.

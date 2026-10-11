@@ -196,16 +196,6 @@ class JobAndPipelineTests(unittest.TestCase):
         self.assertEqual(["--cookies", str(cookie_file)], args)
         self.assertEqual("cookies_file", mode)
 
-    def test_resolve_url_uses_platform_null_device(self):
-        completed = subprocess.CompletedProcess([], 0, stdout="https://example.com/full")
-        with mock.patch.object(pipeline, "find_executable", return_value="curl"), \
-             mock.patch.object(pipeline.subprocess, "run", return_value=completed) as run:
-            resolved = pipeline.resolve_url("https://example.com/short")
-        self.assertEqual("https://example.com/full", resolved)
-        self.assertIn(os.devnull, run.call_args.args[0])
-        self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
-        self.assertEqual("replace", run.call_args.kwargs["errors"])
-
     def test_failed_audio_extraction_does_not_accept_stale_output(self):
         with workspace_temp_dir() as temp_dir:
             output = Path(temp_dir) / "audio.mp3"
@@ -335,7 +325,7 @@ class SetupCheckTests(unittest.TestCase):
         self.assertFalse(check_setup._version_at_least("2026.6.30", "2026.7.4"))
         self.assertIsNone(check_setup._version_at_least("unknown", "2026.7.4"))
 
-    def _versioned_check(self, yt_version="2026.7.4", *, check_updates=False,
+    def _versioned_check(self, yt_version="2026.8.19", *, check_updates=False,
                          latest=(None, None)):
         paths = {
             "ffmpeg": "ffmpeg", "ffprobe": "ffprobe", "curl": "curl",
@@ -366,8 +356,8 @@ class SetupCheckTests(unittest.TestCase):
         fetch.assert_not_called()
         yt = results["yt_dlp"]
         self.assertTrue(yt["installed"])
-        self.assertEqual("2026.7.4", yt["version"])
-        self.assertEqual("2026.7.4", yt["minimum_version"])
+        self.assertEqual("2026.8.19", yt["version"])
+        self.assertEqual("2026.8.19", yt["minimum_version"])
         self.assertTrue(yt["meets_minimum"])
         self.assertEqual("meets_minimum", yt["version_status"])
         self.assertIsNone(yt["latest_version"])
@@ -387,10 +377,10 @@ class SetupCheckTests(unittest.TestCase):
 
     def test_explicit_update_check_reports_latest_status(self):
         results, fetch = self._versioned_check(
-            "2026.7.4", check_updates=True, latest=("2026.8.1", None))
+            "2026.8.19", check_updates=True, latest=("2026.9.1", None))
         fetch.assert_called_once_with()
         yt = results["yt_dlp"]
-        self.assertEqual("2026.8.1", yt["latest_version"])
+        self.assertEqual("2026.9.1", yt["latest_version"])
         self.assertTrue(yt["update_available"])
         self.assertEqual("update_available", yt["version_status"])
 

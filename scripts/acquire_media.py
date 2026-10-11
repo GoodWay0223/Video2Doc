@@ -18,7 +18,7 @@ from webui.job_manager import Job
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="下载 B站/抖音媒体，并输出可机器读取的策略追踪"
+        description="下载 B站/抖音/YouTube/小红书媒体，并输出可机器读取的策略追踪"
     )
     parser.add_argument("source", help="视频 URL，或包含 URL 的平台分享文本")
     parser.add_argument("--output-dir", required=True, help="任务输出目录")

@@ -306,7 +306,7 @@ body {
       <div class="card-icon">📤</div>
       <h3>本地文件转文稿</h3>
       <p>上传本地音频或视频<br>可选云端识别或仅本机识别</p>
-      <div class="card-tags"><span class="tag green">常见音视频</span><span class="tag">≤ 200 MB</span><span class="tag green">🔒 隐私模式需本地模型</span></div>
+      <div class="card-tags"><span class="tag green">常见音视频</span><span class="tag">≤ 4 GB</span><span class="tag green">🔒 隐私模式需本地模型</span></div>
       <button class="btn btn-local">选择文件</button>
     </div>
 
@@ -316,7 +316,7 @@ body {
   <div class="history-section" id="history-section"></div>
 
   <!-- Footer -->
-  <div class="footer">Video2Doc v0.7.0 · 本机运行 · 任务结果保存到本地</div>
+  <div class="footer">Video2Doc v0.8.0 · 本机运行 · 任务结果保存到本地</div>
 
 </div>
 
@@ -353,7 +353,7 @@ body {
     </div>
     <div class="privacy-options">
       <label class="privacy-option"><input type="checkbox" id="tr-enrichment" checked>尝试生成 AI 摘要、要点和标签</label>
-      <div class="privacy-note" id="tr-enrichment-note">需配置 SiliconFlow Key；开启后最多发送前 4000 字正文进行<strong>云端增强</strong>，失败不影响原始转录与格式导出。</div>
+      <div class="privacy-note" id="tr-enrichment-note">需配置 SiliconFlow Key；开启后最多发送 4000 字正文（长文稿取首/中/尾节选）进行<strong>云端增强</strong>，失败不影响原始转录与格式导出。</div>
     </div>
     <div class="progress-steps" id="tr-steps">
       <div class="progress-step"><div class="step-icon">🔗</div><div class="step-label">解析链接</div><div class="step-status">等待中</div></div>
@@ -381,7 +381,7 @@ body {
   <div class="modal-body">
     <div class="upload-zone" id="upload-zone" role="button" tabindex="0">
       <div class="icon">📁</div><p>拖拽文件到此处或点击选择</p>
-      <small>支持常见音频与视频格式</small><small>单文件最大 200 MB</small>
+      <small>支持常见音频与视频格式</small><small>单文件最大 4 GB</small>
     </div>
     <input type="file" id="lo-file" accept="audio/*,video/*" style="display:none">
     <div class="opts-row">
@@ -429,7 +429,9 @@ body {
 </div></div>
 
 <script>
-let activePoll=null, localFile=null, runtimeCapabilities=null;
+let activePoll=null, pollToken=0, activeUpload=null, localFile=null, runtimeCapabilities=null;
+function maxUploadBytes(){const v=runtimeCapabilities&&Number(runtimeCapabilities.max_upload_bytes);return v>0?v:4*1024*1024*1024}
+function stopPolling(){pollToken++;if(activePoll){clearTimeout(activePoll);activePoll=null}if(activeUpload){activeUpload.abort();activeUpload=null}}
 const engineLabels={doubao:'豆包 2.0',tele:'TeleSpeechASR',funasr:'本地 FunASR',whisper:'本地 Whisper'};
 
 // Signature: build hero waveform bars
@@ -446,6 +448,7 @@ const engineLabels={doubao:'豆包 2.0',tele:'TeleSpeechASR',funasr:'本地 FunA
 })();
 
 function openModal(t){
+  stopPolling();
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show'));
   const m=document.getElementById('modal-'+t);
   if(!m)return;
@@ -456,7 +459,7 @@ function openModal(t){
 }
 function closeModal(){
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('show'));
-  if(activePoll){clearTimeout(activePoll);activePoll=null}
+  stopPolling();
 }
 function resetModal(p){
   document.querySelectorAll(`#${p}-steps .progress-step`).forEach(s=>s.classList.remove('active','completed'));
@@ -572,11 +575,11 @@ function renderUploadPrompt(){
   const icon=document.createElement('div');icon.className='icon';icon.textContent='📁';
   const prompt=document.createElement('p');prompt.textContent='拖拽文件到此处或点击选择';
   const formats=document.createElement('small');formats.textContent='支持常见音频与视频格式';
-  const limit=document.createElement('small');limit.textContent='单文件最大 200 MB';
+  const limit=document.createElement('small');limit.textContent='单文件最大 '+formatSize(maxUploadBytes());
   zone.append(icon,prompt,formats,limit);
 }
 function selectFile(file){
-  if(file.size>200*1024*1024)return alert('文件超过 200MB 限制');
+  if(file.size>maxUploadBytes())return alert('文件超过 '+formatSize(maxUploadBytes())+' 限制');
   localFile=file;
   const zone=document.getElementById('upload-zone');
   zone.classList.add('file-selected');
@@ -642,7 +645,7 @@ function syncLocalPrivacyOptions(){
     ?'隐私模式已强制关闭云端内容增强。'
     :(!formatSupports
       ?'TXT/SRT 不包含摘要；请选择 MD、JSON 或全部格式后再开启。关闭本项不代表本地识别。'
-      :(!enrichmentConfigured?'尚未配置 SiliconFlow Key；关闭本项不代表本地识别，标准模式仍可能调用云端 ASR。':'Key 已配置但未联网验证；开启后最多发送前 4000 字正文。关闭本项不代表本地识别。'));
+      :(!enrichmentConfigured?'尚未配置 SiliconFlow Key；关闭本项不代表本地识别，标准模式仍可能调用云端 ASR。':'Key 已配置但未联网验证；开启后最多发送 4000 字正文（长文稿取首/中/尾节选）。关闭本项不代表本地识别。'));
   document.getElementById('lo-local-note').textContent=localOnly
     ?'已启用：音视频和文稿不会发送给豆包、TeleSpeechASR 或 SiliconFlow；“自动”仅按 FunASR → Whisper 尝试。'
     :(!capabilitiesKnown?'正在检查 FunASR / Whisper 是否可用。':(!localReady?'当前不可开启：未检测到 FunASR 或 Whisper。展开下方查看安装步骤；标准模式仍可能使用云端识别。':'当前为标准模式：可能使用已配置的云端识别引擎；选择本地引擎本身不等于开启隐私模式。'));
@@ -655,7 +658,7 @@ function syncOnlineEnrichmentOption(){
   enrichment.disabled=!enrichmentConfigured||!formatSupports;
   document.getElementById('tr-enrichment-note').textContent=!formatSupports
     ?'TXT/SRT 不包含摘要；请选择 MD、JSON 或全部格式后再开启。'
-    :(!enrichmentConfigured?'尚未配置 SiliconFlow Key；关闭不影响原始转录与格式导出。':'Key 已配置但未联网验证；最多发送前 4000 字正文，失败不影响原始转录。');
+    :(!enrichmentConfigured?'尚未配置 SiliconFlow Key；关闭不影响原始转录与格式导出。':'Key 已配置但未联网验证；最多发送 4000 字正文（长文稿取首/中/尾节选），失败不影响原始转录。');
 }
 function renderComponentVersions(data,checkedOnline=false){
   const output=document.getElementById('runtime-components-text');
@@ -748,21 +751,38 @@ async function startLocalTranscribe(){
   const localOnly=document.getElementById('lo-local-only').checked;
   const enrichment=document.getElementById('lo-enrichment');
   const allowEnrichment=!localOnly&&!enrichment.disabled&&enrichment.checked;
-  const fd=new FormData();
-  fd.append('file',localFile);
-  fd.append('formats',document.getElementById('lo-format').value);
-  fd.append('engine',document.getElementById('lo-engine').value);
-  fd.append('local_only',String(localOnly));
-  fd.append('allow_enrichment',String(allowEnrichment));
-  try{
-    const response=await fetch('/api/transcribe-local',{method:'POST',body:fd});
-    const data=await response.json();
-    if(data.error){showError('lo',data.error);return}
+  const params=new URLSearchParams({
+    filename:String(localFile.name||'upload'),
+    formats:document.getElementById('lo-format').value,
+    engine:document.getElementById('lo-engine').value,
+    local_only:String(localOnly),
+    allow_enrichment:String(allowEnrichment),
+  });
+  // Stream the raw file: the server writes it to disk chunk by chunk.
+  const token=++pollToken;
+  const xhr=new XMLHttpRequest();
+  activeUpload=xhr;
+  xhr.open('POST','/api/transcribe-local?'+params.toString());
+  xhr.setRequestHeader('Content-Type','application/octet-stream');
+  xhr.upload.onprogress=event=>{
+    if(token!==pollToken||!event.lengthComputable)return;
+    const pct=Math.round(event.loaded/event.total*100);
+    document.getElementById('lo-status').textContent='⏫ 上传中 '+pct+'%';
+    document.getElementById('lo-bar').style.width=pct+'%';
+  };
+  xhr.onload=()=>{
+    activeUpload=null;
+    if(token!==pollToken)return;
+    let data={};
+    try{data=JSON.parse(xhr.responseText||'{}')}catch(e){}
+    if(xhr.status>=400||data.error){showError('lo',data.error||('上传失败（HTTP '+xhr.status+'）'));return}
     activeJob('lo',null,null,async result=>{
       await showTranscriptResult('lo',result,'btn-lo');
       loadHistory();
     },data.job_id);
-  }catch(e){showError('lo','连接失败')}
+  };
+  xhr.onerror=()=>{activeUpload=null;if(token===pollToken)showError('lo','连接失败')};
+  xhr.send(localFile);
 }
 
 // Shared polling
@@ -778,23 +798,27 @@ async function activeJob(prefix,endpoint,body,onDone,originalId){
   }
   const safeId=safeJobId(jobId);
   if(!safeId){showError(prefix,'服务端返回了无效任务编号');return}
+  // A newer job or a closed modal invalidates this poller, even mid-request.
+  const token=++pollToken;
   const poll=async()=>{
+    if(token!==pollToken)return;
     try{
       const response=await fetch('/api/status/'+safeId);
       const job=await response.json();
+      if(token!==pollToken)return;
       updateSteps(prefix,job.status);setProgress(prefix,job.progress,job.status);
-      if(job.status==='done'){await onDone(job);activePoll=null;return}
-      if(job.status==='error'){showError(prefix,job.error||'未知错误');return}
+      if(job.status==='done'){activePoll=null;await onDone(job);return}
+      if(job.status==='error'){activePoll=null;showError(prefix,job.error||'未知错误');return}
       activePoll=setTimeout(poll,1000);
-    }catch(e){activePoll=setTimeout(poll,2000)}
+    }catch(e){if(token===pollToken)activePoll=setTimeout(poll,2000)}
   };
   poll();
 }
 // 后端状态 -> 该弹窗应高亮的步骤序号（此前置步骤自动标记完成）
 const statusStep={
-  dl:{resolving:0, downloading:1},
-  tr:{resolving:0, downloading:1, extracting:2, transcribing:2, exporting:3},
-  lo:{extracting:1, transcribing:1, exporting:2}   // 上传文件(0) 任务开始时即视为完成
+  dl:{queued:0, resolving:0, downloading:1},
+  tr:{queued:0, resolving:0, downloading:1, extracting:2, transcribing:2, exporting:3},
+  lo:{queued:1, extracting:1, transcribing:1, exporting:2}   // 上传文件(0) 任务开始时即视为完成
 };
 function updateSteps(p,s){
   if(s==='done'){document.querySelectorAll(`#${p}-steps .progress-step`).forEach(el=>{el.classList.remove('active');el.classList.add('completed')});return;}
@@ -812,6 +836,7 @@ function switchTab(btn,cid){btn.parentElement.querySelectorAll('.result-tab').fo
 function formatSize(value){
   const bytes=Number(value);
   if(!Number.isFinite(bytes)||bytes<0)return'大小未知';
+  if(bytes>=1073741824)return (bytes/1073741824).toFixed(bytes%1073741824?1:0)+' GB';
   return bytes<1024?bytes+' B':bytes<1048576?(bytes/1024).toFixed(1)+' KB':(bytes/1048576).toFixed(1)+' MB';
 }
 async function copyText(t){try{await navigator.clipboard.writeText(t);alert('已复制')}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('已复制')}}

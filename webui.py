@@ -12,8 +12,8 @@ Three core functions:
 import argparse
 import http.server
 import sys
-from webui import __version__
-from webui.server import Handler
+from webui import __version__, job_manager
+from webui.server import Handler, allowed_hosts_for
 
 PORT = 8765
 HOST = "127.0.0.1"
@@ -56,7 +56,16 @@ def main():
 
     port = args.port
     host = args.host
-    server = http.server.HTTPServer((host, port), Handler)
+    Handler.allowed_hosts = allowed_hosts_for(host)
+    try:
+        # Threaded: status polling stays responsive during uploads/downloads.
+        server = http.server.ThreadingHTTPServer((host, port), Handler)
+    except OSError as exc:
+        print(f"  ❌ 无法监听 {host}:{port}（{exc}）。端口可能已被占用，可改用 --port 8766")
+        sys.exit(1)
+    restored = job_manager.load_history()
+    if restored:
+        print(f"  已恢复 {restored} 条历史任务（output/ 目录）")
     print(f"""
 ╔══════════════════════════════════════════╗
 ║   🎬 Video2Doc 工坊 v{__version__:<20}║
@@ -69,7 +78,8 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         print("\n已停止。")
-        server.shutdown()
+    finally:
+        server.server_close()
 
 if __name__ == "__main__":
     main()

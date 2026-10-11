@@ -4,6 +4,43 @@
 
 暂无。
 
+## [v0.8.0] — 2026-10-11
+
+### Added
+- `video2doc.py` 命令行：与 Web UI 共用同一套 pipeline（链接/分享文本/本地文件、批量、`--download`、`--local-only`、`--json`）；`video2doc.sh` 改为其薄封装，CLI 不再是只能转写已有音频的半成品。
+- 任务持久化：每个任务写入 `output/<任务 ID>/job.json`，重启服务后“最近处理”自动恢复；运行中被中断的任务明确标记为 `INTERRUPTED`。
+- 有界任务队列：默认最多并行 2 个任务（`VIDEO2DOC_MAX_JOBS` 可调），避免多个下载/本地模型同时运行耗尽内存。
+- YouTube/通用站点也走“字幕优先 → 仅音频”路径，不再为转文稿下载完整视频；小红书走统一的直链 → yt-dlp 兜底。
+- Markdown 文稿包含标题、来源、时长、识别来源，并按停顿/句末自动分段；TXT 同样分段；JSON 增加元数据。
+- `VIDEO2DOC_WHISPER_LANGUAGE`（如 `auto`/`en`）与 `VIDEO2DOC_ENRICH_MODEL` 配置项。
+
+### Changed
+- Web 服务改为多线程，上传/下载大文件期间状态轮询与页面访问不再被阻塞。
+- 本地上传改为原始字节流式写盘，单文件上限由 200 MB 提升到 4 GB，内存占用恒定；前端显示上传进度。旧 multipart 接口保留（200 MB）。
+- 所有音频在识别前统一转为 16 kHz 单声道 MP3（一次 ffmpeg），云端上传体积通常缩小 4–8 倍。
+- 抖音转文稿改为“移动分享 MP4 → Playwright 签名音轨”，免浏览器路径优先，失败时通常不到 1 秒即切换。
+- 豆包轮询时限随音频时长伸缩（至少 3 分钟），TeleSpeechASR 超时同理；长音频不再因固定 90/120 秒超时失败。
+- FunASR/Whisper 模型在进程内缓存并串行推理，不再每个任务重新加载。
+- 云端摘要在 4000 字预算内对长文稿取首/中/尾节选，摘要覆盖全篇而非只看开头。
+- yt-dlp 下载启用 4 路分片并发，视频优先 MP4/M4A；`~/.video2doc/config.json` 读取逻辑统一，自检与 pipeline 对 UTF-8 BOM 配置的判断一致。
+- yt-dlp 最低版本提升到 2026.8.19；GitHub Actions 升级到 v7，CI 矩阵改为 Python 3.10/3.12/3.14。
+
+### Security
+- 校验 Host 头以阻止 DNS rebinding；POST 请求校验 Origin/Sec-Fetch-Site，拒绝其他网站的跨站请求（CSRF）。
+- 首页增加 `X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`。
+
+### Fixed
+- Windows 上 `raw/tele_result.json` 按系统 GBK 写入导致含 emoji/生僻字时报错、预览回退读取失败；现统一 UTF-8。
+- 纯下载失败时具体原因被笼统的“下载失败”覆盖。
+- YouTube 字幕请求 `--sub-langs all` 会拉取数百条机器翻译轨并触发 HTTP 429；B站弹幕可能被误当作字幕。
+- 本地 WAV/FLAC 等音频被直接改名为 `audio.mp3` 交给引擎；本地视频提取失败时错误不明确。
+- 引擎返回空文本时没有任何原因提示；YouTube 自动字幕的滚动重复行被重复写入文稿。
+- 纯下载任务缺少视频标题；前端关闭弹窗后旧轮询仍可能覆盖新任务界面。
+
+### Verification
+- 96 项 Python 回归测试通过；Python 编译、JavaScript、Shell 语法检查通过。
+- Windows 真实端到端：YouTube 字幕路径（4.7 s）、YouTube MP4 下载、B站公共音轨 + 豆包 + 云端摘要、抖音（分享页无数据 0.3 s 内切换 Playwright 音轨）+ 豆包、本地上传 TeleSpeechASR、multipart 旧接口、隐私模式 Whisper、CLI 本地文件与链接；无头浏览器验证流式上传、结果展示与历史恢复。
+
 ## [v0.7.0] — 2026-08-02
 
 ### Added

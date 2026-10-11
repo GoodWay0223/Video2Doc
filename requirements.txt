@@ -1,4 +1,4 @@
 # Core runtime dependency used for Bilibili, YouTube, and generic video downloads.
 # The lower bound is the tested release baseline. Dependabot raises it weekly,
 # while normal installs remain free to resolve a newer stable yt-dlp release.
-yt-dlp>=2026.7.4
+yt-dlp>=2026.8.19

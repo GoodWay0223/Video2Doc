@@ -195,10 +195,10 @@ class RequestBoundaryTests(unittest.TestCase):
             body,
             {"Content-Length": str(len(body)), "Content-Type": "application/json"},
         )
-        with mock.patch.object(server.threading, "Thread") as thread:
+        with mock.patch.object(server.job_manager, "submit") as submit:
             handler.do_POST()
         self.assertEqual(handler.response_statuses, [400])
-        thread.assert_not_called()
+        submit.assert_not_called()
 
     def test_json_response_does_not_enable_wildcard_cors(self):
         handler = make_handler()
@@ -226,11 +226,11 @@ class RequestBoundaryTests(unittest.TestCase):
         fake_job = mock.Mock(id="job123")
         with mock.patch.object(server.job_manager, "Job", return_value=fake_job) as job_class, \
                 mock.patch.object(server.job_manager, "add_job"), \
-                mock.patch.object(server.threading, "Thread") as thread:
+                mock.patch.object(server.job_manager, "submit") as submit:
             handler.do_POST()
         self.assertEqual(handler.response_statuses, [200])
         self.assertFalse(job_class.call_args.kwargs["allow_enrichment"])
-        thread.return_value.start.assert_called_once_with()
+        submit.assert_called_once_with(fake_job, server.pipeline.run_transcribe_pipeline)
 
 
 class UploadSafetyTests(unittest.TestCase):
@@ -278,10 +278,9 @@ class UploadSafetyTests(unittest.TestCase):
                     "Content-Type": f"multipart/form-data; boundary={boundary}",
                 },
             )
-            fake_thread = mock.Mock()
             with mock.patch.object(server.job_manager, "Job", FakeJob), \
                     mock.patch.object(server.job_manager, "add_job"), \
-                    mock.patch.object(server.threading, "Thread", return_value=fake_thread):
+                    mock.patch.object(server.job_manager, "submit") as submit:
                 handler.do_POST()
 
             self.assertEqual(handler.response_statuses, [200])
@@ -289,7 +288,97 @@ class UploadSafetyTests(unittest.TestCase):
             self.assertFalse((tmp / "owned.mp4").exists())
             self.assertTrue(captured["local_only"])
             self.assertFalse(captured["allow_enrichment"])
-            fake_thread.start.assert_called_once_with()
+            submit.assert_called_once()
+
+    def test_raw_upload_streams_to_disk_with_query_options(self):
+        payload = b"x" * (server.STREAM_CHUNK_SIZE + 17)
+        with workspace_temp_dir() as tmp:
+            job_dir = tmp / "jobraw"
+            captured = {}
+
+            class FakeJob:
+                def __init__(self, **kwargs):
+                    captured.update(kwargs)
+                    self.id = "jobraw"
+                    self.dir = job_dir
+                    self.dir.mkdir(parents=True)
+                    self.local_filename = ""
+                    self.local_filesize = 0
+
+            handler = make_handler(
+                "/api/transcribe-local?filename=%E4%BC%9A%E8%AE%AE.M4A&formats=srt"
+                "&engine=whisper&local_only=true&allow_enrichment=true",
+                payload,
+                {"Content-Length": str(len(payload)),
+                 "Content-Type": "application/octet-stream"},
+            )
+            with mock.patch.object(server.job_manager, "Job", FakeJob), \
+                    mock.patch.object(server.job_manager, "add_job"), \
+                    mock.patch.object(server.job_manager, "submit") as submit:
+                handler.do_POST()
+
+            self.assertEqual(handler.response_statuses, [200])
+            stored = job_dir / "raw" / "uploaded-media.m4a"
+            self.assertEqual(payload, stored.read_bytes())
+            self.assertFalse((job_dir / "raw" / "uploaded-media.m4a.part").exists())
+            self.assertEqual(["srt"], captured["formats"])
+            self.assertEqual("whisper", captured["engine"])
+            self.assertTrue(captured["local_only"])
+            self.assertFalse(captured["allow_enrichment"])
+            submit.assert_called_once()
+
+    def test_truncated_raw_upload_leaves_no_job_directory(self):
+        with workspace_temp_dir() as tmp:
+            job_dir = tmp / "jobcut"
+
+            class FakeJob:
+                def __init__(self, **kwargs):
+                    self.id = "jobcut"
+                    self.dir = job_dir
+                    self.dir.mkdir(parents=True)
+
+            handler = make_handler(
+                "/api/transcribe-local?filename=a.mp3",
+                b"short",
+                {"Content-Length": "1000", "Content-Type": "application/octet-stream"},
+            )
+            with mock.patch.object(server.job_manager, "Job", FakeJob), \
+                    mock.patch.object(server.job_manager, "submit") as submit:
+                handler.do_POST()
+            self.assertEqual(handler.response_statuses, [400])
+            self.assertFalse(job_dir.exists())
+            submit.assert_not_called()
+
+
+class HostAndOriginTests(unittest.TestCase):
+    def test_dns_rebinding_host_is_rejected(self):
+        handler = make_handler("/api/history", headers={"Host": "evil.example:8765"})
+        handler.do_GET()
+        self.assertEqual([403], handler.response_statuses)
+
+    def test_loopback_hosts_are_accepted(self):
+        for host in ("127.0.0.1:8765", "localhost:8765", "[::1]:8765"):
+            with self.subTest(host=host), \
+                    mock.patch.object(server.job_manager, "get_history", return_value=[]):
+                handler = make_handler("/api/history", headers={"Host": host})
+                handler.do_GET()
+                self.assertEqual([200], handler.response_statuses)
+
+    def test_cross_site_post_is_rejected_before_reading_body(self):
+        for headers in (
+            {"Host": "127.0.0.1:8765", "Origin": "https://evil.example"},
+            {"Host": "127.0.0.1:8765", "Origin": "null"},
+            {"Host": "127.0.0.1:8765", "Sec-Fetch-Site": "cross-site"},
+        ):
+            with self.subTest(headers=headers):
+                handler = make_handler("/api/transcribe-online", headers=dict(headers))
+                handler.rfile = mock.Mock(read=mock.Mock(side_effect=AssertionError("read")))
+                handler.do_POST()
+                self.assertEqual([403], handler.response_statuses)
+
+    def test_lan_mode_accepts_any_host(self):
+        self.assertIsNone(server.allowed_hosts_for("0.0.0.0"))
+        self.assertIn("192.168.1.5", server.allowed_hosts_for("192.168.1.5"))
 
 
 class StartupDefaultsTests(unittest.TestCase):

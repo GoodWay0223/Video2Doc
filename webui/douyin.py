@@ -16,6 +16,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from scripts.platform_utils import load_user_config
+
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -190,27 +192,10 @@ def inspect_mobile_share(source: str, *, timeout: float = 20) -> dict:
     }
 
 
-def _config() -> dict:
-    path = Path.home() / ".video2doc" / "config.json"
-    if not path.exists():
-        return {}
-    try:
-        raw = path.read_bytes()
-    except OSError:
-        return {}
-    for encoding in ("utf-8-sig", "gb18030"):
-        try:
-            payload = json.loads(raw.decode(encoding))
-            return payload if isinstance(payload, dict) else {}
-        except (UnicodeError, json.JSONDecodeError):
-            continue
-    return {}
-
-
 def storage_state_path() -> Path | None:
     """Return an explicitly configured Playwright state file, if any."""
 
-    value = os.environ.get("VIDEO2DOC_DOUYIN_STORAGE_STATE") or _config().get(
+    value = os.environ.get("VIDEO2DOC_DOUYIN_STORAGE_STATE") or load_user_config().get(
         "douyin_storage_state"
     )
     if not value:

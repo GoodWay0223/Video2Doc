@@ -1,9 +1,33 @@
 """Small, dependency-free helpers shared by Windows and macOS entry points."""
 
+import json
 import os
 import shutil
 import sys
 from pathlib import Path
+
+
+def user_config_path():
+    return Path.home() / ".video2doc" / "config.json"
+
+
+def load_user_config():
+    """Read ~/.video2doc/config.json as UTF-8 (with/without BOM) or legacy GB18030.
+
+    This is the single source of truth for every entry point (Web UI, CLI,
+    self-check) so that a key visible to one component is visible to all.
+    """
+    try:
+        raw = user_config_path().read_bytes()
+    except (OSError, RuntimeError):
+        return {}
+    for encoding in ("utf-8-sig", "gb18030"):
+        try:
+            payload = json.loads(raw.decode(encoding))
+            return payload if isinstance(payload, dict) else {}
+        except (UnicodeError, json.JSONDecodeError):
+            continue
+    return {}
 
 
 def candidate_bin_dirs(*, os_name=None, platform_name=None, environ=None,
