@@ -76,11 +76,25 @@ class IllustratedTests(unittest.TestCase):
                   {"file": "ad.jpg", "start": 30, "end": 40}]
         segments = [{"start": 1, "text": "第一句。"}, {"start": 9.8, "text": "换页前一刻。"},
                     {"start": 12, "text": "第二页。"}]
-        sections = illustrate.align(slides, segments, pipeline._join_text)
+        sections = illustrate.align(slides, segments, pipeline._join_text, compact=False)
         self.assertEqual(["a.jpg", "b.jpg"], [section["file"] for section in sections])
         self.assertEqual(["第一句。"], sections[0]["paragraphs"])
         self.assertEqual(["换页前一刻。第二页。"], sections[1]["paragraphs"])
         self.assertEqual("00:10–00:30", sections[1]["time"])
+
+    def test_compact_mode_folds_low_value_frames_without_losing_text(self):
+        long = "这一页讲了很多内容。" * 10
+        slides = [{"file": "title.jpg", "start": 0, "end": 5}, {"file": "a.jpg", "start": 5, "end": 20},
+                  {"file": "b.jpg", "start": 20, "end": 25}, {"file": "c.jpg", "start": 25, "end": 60}]
+        segments = [{"start": 1, "text": "开场。"}, {"start": 6, "text": long},
+                    {"start": 21, "text": "过渡。"}, {"start": 26, "text": long}]
+        sections = illustrate.align(slides, segments, pipeline._join_text)
+        self.assertEqual(["a.jpg", "c.jpg"], [section["file"] for section in sections])
+        self.assertTrue(sections[0]["paragraphs"][0].startswith("开场。"))
+        self.assertTrue("".join(sections[0]["paragraphs"]).endswith("过渡。"))
+        self.assertEqual("00:05–00:25", sections[0]["time"])
+        text = "".join("".join(s["paragraphs"]) for s in sections)
+        self.assertEqual(len("开场。" + long + "过渡。" + long), len(text))
 
     def test_html_is_self_contained_and_markdown_links_images(self):
         with tempfile.TemporaryDirectory() as temp_dir:

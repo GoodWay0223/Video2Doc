@@ -79,21 +79,63 @@ def _paragraphs(text, limit=230):
     return paragraphs
 
 
-def align(slides, segments, join_text):
-    """Attach each narration segment to the slide on screen when it started."""
-    sections = []
+MIN_CHARS_PER_IMAGE = 80
+DUPLICATE_DIFF = 6.0  # mean absolute difference (0–255) of 32×18 grayscale thumbnails
+
+
+def _signature(path):
+    """Tiny grayscale thumbnail as raw bytes (no imaging library needed)."""
+    ffmpeg = find_executable(["ffmpeg"])
+    result = subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-i", str(path),
+                             "-vf", "scale=32:18,format=gray", "-f", "rawvideo", "-"],
+                            capture_output=True, timeout=60)
+    return result.stdout if len(result.stdout) == 32 * 18 else None
+
+
+def _similar(a, b):
+    return bool(a and b) and sum(abs(x - y) for x, y in zip(a, b)) / len(a) < DUPLICATE_DIFF
+
+
+def align(slides, segments, join_text, *, compact=True, slides_dir=None,
+          min_chars=MIN_CHARS_PER_IMAGE):
+    """Attach each narration segment to the slide on screen when it started.
+
+    compact=True keeps the document readable: a frame whose narration is very
+    short, or that looks like the previous kept frame (a slide being built up,
+    a revisited slide), is folded into the previous kept frame. No text is lost.
+    """
+    raw = []
     for slide in slides:
         text = ""
         for segment in segments:
             start = float(segment.get("start") or 0)
             if slide["start"] - 0.6 <= start < slide["end"] - 0.6:
                 text = join_text(text, str(segment.get("text") or "").strip())
-        sections.append({**slide, "time": f"{_fmt(slide['start'])}–{_fmt(slide['end'])}",
-                         "paragraphs": _paragraphs(text) if text else []})
+        raw.append({**slide, "text": text})
     # Closing frames without narration are usually end cards or adverts.
-    while len(sections) > 1 and not sections[-1]["paragraphs"]:
-        sections.pop()
-    return sections
+    while len(raw) > 1 and not raw[-1]["text"]:
+        raw.pop()
+    kept, pending = [], ""
+    signatures = {}
+    for slide in raw:
+        if compact and slides_dir:
+            signatures[slide["file"]] = _signature(Path(slides_dir) / slide["file"])
+        fold = compact and kept and (
+            len(slide["text"]) < min_chars
+            or _similar(signatures.get(slide["file"]), signatures.get(kept[-1]["file"])))
+        if fold:
+            kept[-1]["text"] = join_text(kept[-1]["text"], slide["text"])
+            kept[-1]["end"] = slide["end"]
+        elif compact and not kept and len(slide["text"]) < min_chars and len(raw) > 1:
+            pending = join_text(pending, slide["text"])  # title cards before the first real slide
+        else:
+            kept.append({**slide, "text": join_text(pending, slide["text"])})
+            pending = ""
+    if pending:
+        kept.append({**raw[-1], "text": pending})
+    return [{"file": s["file"], "start": s["start"], "end": s["end"],
+             "time": f"{_fmt(s['start'])}–{_fmt(s['end'])}",
+             "paragraphs": _paragraphs(s["text"], 320) if s["text"] else []} for s in kept]
 
 
 def render_markdown(title, facts, sections, image_prefix="slides/"):
@@ -128,7 +170,7 @@ def render_html(title, facts, sections, slides_dir):
             f"<style>{style}</style></head><body>{''.join(parts)}</body></html>")
 
 
-def build(video, segments, job_dir, *, title, facts, join_text, duration):
+def build(video, segments, job_dir, *, title, facts, join_text, duration, compact=True):
     """Write 图文稿 files into job_dir; returns the export entries for the UI."""
     job_dir = Path(job_dir)
     slides_dir = job_dir / "slides"
@@ -136,7 +178,11 @@ def build(video, segments, job_dir, *, title, facts, join_text, duration):
     slides = extract_frames(video, starts, duration, slides_dir)
     if not slides:
         return []
-    sections = align(slides, segments, join_text)
+    sections = align(slides, segments, join_text, compact=compact, slides_dir=slides_dir)
+    used = {section["file"] for section in sections}
+    for slide in slides:  # folded frames are not referenced by any document
+        if slide["file"] not in used:
+            (slides_dir / slide["file"]).unlink(missing_ok=True)
     (slides_dir / "sections.json").write_text(json.dumps(sections, ensure_ascii=False, indent=1),
                                               encoding="utf-8")
     page = job_dir / "illustrated.html"
