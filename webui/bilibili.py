@@ -175,6 +175,9 @@ def fetch_dash(metadata: dict, *, quality: int = 64) -> dict:
         "qn": quality,
         "fnval": 16,
         "fourk": 0,
+        # Without this flag anonymous requests are capped at 480p; with it the
+        # public player serves 720p/1080p previews, still without any cookie.
+        "try_look": 1,
     }
     if metadata.get("bvid"):
         params["bvid"] = metadata["bvid"]

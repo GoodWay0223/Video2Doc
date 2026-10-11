@@ -7,6 +7,7 @@ Examples:
   python video2doc.py meeting.m4a --format all --local-only       # local file, on-device ASR
   python video2doc.py --download "https://youtu.be/..."           # download the video only
   python video2doc.py --batch links.txt --format md,srt            # one link/file per line
+  python video2doc.py "<讲座链接>" --illustrated --hotwords "京极彩,CEDEC"   # slides + matching text
 """
 import argparse
 import json
@@ -60,6 +61,8 @@ def build_job(item, args):
         "job_id": job_id, "job_dir": output_root / job_id, "formats": args.format,
         "engine": args.engine, "local_only": args.local_only,
         "allow_enrichment": not (args.no_enrich or args.local_only),
+        "hotwords": pipeline.parse_hotwords(args.hotwords or ""),
+        "illustrated": args.illustrated,
     }
     local = Path(item).expanduser()
     if local.is_file():
@@ -77,12 +80,17 @@ def build_job(item, args):
     return Job(url=url, job_type=JobType.TRANSCRIBE_ONLINE, **common), pipeline.run_transcribe_pipeline, ()
 
 
+def log(message=""):
+    # Progress goes to stderr so that `--json` keeps stdout machine-readable.
+    print(message, file=sys.stderr, flush=True)
+
+
 def run_one(item, args, index, total):
-    print(f"\n[{index}/{total}] {item}")
+    log(f"\n[{index}/{total}] {item}")
     try:
         job, target, extra = build_job(item, args)
     except (ValueError, pipeline.PipelineError) as exc:
-        print(f"  ❌ {exc}")
+        log(f"  ❌ {exc}")
         return None
     worker = threading.Thread(target=target, args=(job, *extra), daemon=True)
     worker.start()
@@ -90,18 +98,20 @@ def run_one(item, args, index, total):
     while worker.is_alive():
         if job.status != last and job.status in STATUS_LABELS:
             last = job.status
-            print(f"  … {STATUS_LABELS[last]}")
+            log(f"  … {STATUS_LABELS[last]}")
         time.sleep(0.3)
     worker.join()
     job.finished_at = time.time()
     job.save()
     if job.status == "done":
         engine = pipeline.ENGINE_LABELS.get(job.engine_used, job.engine_used)
-        print(f"  ✅ {job.title or '完成'}" + (f"（{engine}）" if engine else ""))
+        log(f"  ✅ {job.title or '完成'}" + (f"（{engine}）" if engine else ""))
+        if job.engine_note:
+            log(f"     注：{job.engine_note}")
         for entry in job.files:
-            print(f"     {job.dir / entry['file']}")
+            log(f"     {job.dir / entry['file']}")
     else:
-        print(f"  ❌ [{job.error_code or 'ERROR'}] {job.error or '失败'}")
+        log(f"  ❌ [{job.error_code or 'ERROR'}] {job.error or '失败'}")
     return job
 
 
@@ -122,6 +132,9 @@ def main(argv=None):
     parser.add_argument("--local-only", action="store_true",
                         help="隐私模式：仅本地文件，仅 FunASR/Whisper，禁止任何云端调用")
     parser.add_argument("--no-enrich", action="store_true", help="不调用云端 AI 摘要/要点/标签")
+    parser.add_argument("--hotwords", help="热词：人名/术语，逗号分隔，提高识别准确率（豆包 / Whisper）")
+    parser.add_argument("--illustrated", action="store_true",
+                        help="生成图文稿：截取每张幻灯片/画面并配上对应原文（HTML + Markdown 图片包）")
     parser.add_argument("--output", help=f"输出根目录（默认 {OUTPUT_DIR}）")
     parser.add_argument("--json", action="store_true", help="结束时向 stdout 输出任务结果 JSON")
     parser.add_argument("--version", action="version", version=f"Video2Doc {__version__}")
@@ -135,7 +148,7 @@ def main(argv=None):
 
     jobs = [run_one(item, args, index, len(items)) for index, item in enumerate(items, 1)]
     succeeded = sum(1 for job in jobs if job and job.status == "done")
-    print(f"\n完成：✅ {succeeded}  ❌ {len(items) - succeeded}")
+    log(f"\n完成：✅ {succeeded}  ❌ {len(items) - succeeded}")
     if args.json:
         print(json.dumps([job.to_dict() if job else None for job in jobs], ensure_ascii=False, indent=2))
     return 0 if succeeded == len(items) else 1

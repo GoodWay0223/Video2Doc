@@ -14,7 +14,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 
-from . import bilibili, douyin
+from . import bilibili, douyin, illustrate
 from .job_manager import Job, JobType, OUTPUT_DIR
 from scripts.platform_utils import find_executable, load_user_config
 
@@ -1024,6 +1024,41 @@ def _asr_timeout(path):
     return max(180.0, min(3 * 3600.0, _probe_duration(path)))
 
 
+MAX_HOTWORDS = 200
+MAX_HOTWORD_CHARS = 30
+
+
+def parse_hotwords(value):
+    """Accept a list or a comma / newline / 、 separated string; keep order, drop duplicates."""
+    items = value if isinstance(value, (list, tuple)) else re.split(r"[,，、;；\n\r]+", str(value or ""))
+    words = []
+    for item in items:
+        word = str(item).strip()
+        if (word and len(word) <= MAX_HOTWORD_CHARS and word not in words
+                and not any(ord(ch) < 32 for ch in word)):
+            words.append(word)
+    return words[:MAX_HOTWORDS]
+
+
+def asr_hotwords(job):
+    """Job hotwords first, then the user's global list from settings."""
+    return parse_hotwords(list(getattr(job, "hotwords", None) or [])
+                          + parse_hotwords(_read_config().get("hotwords", "")))
+
+
+def _doubao_context(job):
+    """Hotwords + the video title as scene context (Doubao 2.0 `corpus.context`)."""
+    context = {}
+    words = asr_hotwords(job)
+    if words:
+        context["hotwords"] = [{"word": word} for word in words]
+    title = " ".join(str(getattr(job, "title", "") or "").split())[:200]
+    if title:
+        context["context_type"] = "dialog_ctx"
+        context["context_data"] = [{"text": f"这是一段视频的音频，视频标题：{title}"}]
+    return json.dumps(context, ensure_ascii=False) if context else ""
+
+
 def _get_doubao_key():
     """读取豆包语音 API Key：环境变量 → Video2Doc 专用配置。"""
     key = os.environ.get("DOUBAO_API_KEY", "")
@@ -1060,15 +1095,19 @@ def _transcribe_doubao(audio_path, job):
         audio_format = src.suffix.lower().lstrip(".") or "mp3"
         b64 = base64.b64encode(src.read_bytes()).decode()
         rid = str(uuid.uuid4())
+        request = {"model_name": "bigmodel", "enable_itn": True,
+                   "enable_punc": True, "enable_ddc": False,
+                   "enable_speaker_info": False, "enable_channel_split": False,
+                   "show_utterances": True, "vad_segment": False,
+                   "sensitive_words_filter": ""}
+        context = _doubao_context(job)
+        if context:
+            request["corpus"] = {"context": context}
         body = json.dumps({
             "user": {"uid": "video2doc"},
             "audio": {"data": b64, "format": audio_format, "codec": "raw",
                       "rate": 16000, "bits": 16, "channel": 1},
-            "request": {"model_name": "bigmodel", "enable_itn": True,
-                        "enable_punc": True, "enable_ddc": False,
-                        "enable_speaker_info": False, "enable_channel_split": False,
-                        "show_utterances": True, "vad_segment": False,
-                        "sensitive_words_filter": ""}
+            "request": request,
         }).encode("utf-8")
         base_hdr = {"Content-Type": "application/json",
                     "x-api-key": key,
@@ -1351,8 +1390,12 @@ def _transcribe_whisper(audio_path, job):
                        or config.get("whisper_language") or "zh").strip().lower()
         language = None if language == "auto" else language
         options = {"language": language} if language else {}
-        if language and language.startswith("zh"):
-            options["initial_prompt"] = "以下是普通话的句子，请使用简体中文并加上标点。"
+        prompt = "以下是普通话的句子，请使用简体中文并加上标点。" if language and language.startswith("zh") else ""
+        words = asr_hotwords(job)
+        if words:
+            prompt += "关键词：" + "、".join(words[:40]) + "。"
+        if prompt:
+            options["initial_prompt"] = prompt
         with _local_model_lock:
             model = _cached_local_model(
                 ("whisper", id(whisper), model_name),
@@ -1530,17 +1573,22 @@ def _document_meta(job):
     return meta
 
 
-def render_markdown(job, transcript, enrichment=None):
+def _document_facts(job, *, link=True):
     meta = _document_meta(job)
     facts = []
     if meta["source"]:
-        facts.append(f"来源：<{meta['source']}>")
+        facts.append(f"来源：<{meta['source']}>" if link else f"来源：{meta['source']}")
     if meta["file"]:
         facts.append(f"文件：{meta['file']}")
     if meta["duration"]:
         facts.append(f"时长：{meta['duration']}")
     if meta["engine"]:
         facts.append(f"文字来源：{ENGINE_LABELS.get(meta['engine'], meta['engine'])}")
+    return meta, facts
+
+
+def render_markdown(job, transcript, enrichment=None):
+    meta, facts = _document_facts(job)
     lines = [f"# {meta['title']}", ""]
     if facts:
         lines += ["> " + " · ".join(facts), ""]
@@ -1682,7 +1730,7 @@ def _fail(job, exc):
     job.status = "error"
 
 
-def _finish_transcript(job, transcript):
+def _finish_transcript(job, transcript, video=None):
     _write_json(job.dir / "raw" / "tele_result.json", transcript)
     text = str(transcript.get("text", ""))
     if not job.title:
@@ -1692,7 +1740,17 @@ def _finish_transcript(job, transcript):
         job.duration = _format_duration(segs[-1].get("end", 0))
     job.status = "exporting"; job.progress = 85
     enrichment = _enrich_transcript(text, job) if _should_enrich(job) else None
-    job.files = export_formats(job, transcript, enrichment)
+    files = export_formats(job, transcript, enrichment)
+    if video and getattr(job, "illustrated", False):
+        job.progress = 90
+        try:
+            meta, facts = _document_facts(job, link=False)
+            files += illustrate.build(video, segs, job.dir, title=meta["title"], facts=facts,
+                                      join_text=_join_text, duration=_probe_duration(video))
+        except Exception as exc:  # The transcript itself is still valid and exported.
+            note = f"图文稿生成失败：{_safe_message(exc)[:120]}"
+            job.engine_note = f"{job.engine_note}；{note}" if job.engine_note else note
+    job.files = files
     job.error = None
     job.error_code = ""
     job.progress = 100
@@ -1712,6 +1770,14 @@ def run_transcribe_pipeline(job):
         platform = platform_of(source)
         engine = (getattr(job, "engine", "auto") or "auto").lower()
         transcript = None
+        video = None
+        if getattr(job, "illustrated", False):
+            # Slides need the picture, so fetch the full video once and reuse its audio.
+            job.status = "downloading"
+            job.progress = 20
+            video = download_video(job)
+            if not video:
+                raise PipelineError(job.error or "视频下载失败", code=job.error_code or "DOWNLOAD_FAILED")
 
         # auto 模式先只抓字幕；有字幕时不下载媒体，也不消耗 ASR。
         if engine == "auto" and platform in SUBTITLE_PLATFORMS:
@@ -1728,7 +1794,7 @@ def run_transcribe_pipeline(job):
         if not transcript:
             job.status = "downloading"
             job.progress = 30
-            media = acquire_transcription_audio(job)
+            media = video or acquire_transcription_audio(job)
             job.status = "extracting"
             job.progress = 45
             audio = prepare_asr_audio(media)
@@ -1738,7 +1804,7 @@ def run_transcribe_pipeline(job):
             if not transcript:
                 raise PipelineError(job.error or "转录失败", code="TRANSCRIPTION_FAILED")
 
-        _finish_transcript(job, transcript)
+        _finish_transcript(job, transcript, video)
     except Exception as exc:
         _fail(job, exc)
 
@@ -1758,7 +1824,7 @@ def run_local_pipeline(job, file_path):
         transcript = transcribe(audio, job)
         if not transcript:
             raise PipelineError(job.error or "转录失败", code="TRANSCRIPTION_FAILED")
-        _finish_transcript(job, transcript)
+        _finish_transcript(job, transcript, fp if fp.suffix.lower() in VIDEO_SUFFIXES else None)
     except Exception as exc:
         _fail(job, exc)
 

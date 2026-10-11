@@ -261,7 +261,7 @@ body {
 .field { display:grid; gap:5px; margin-bottom:.9rem; }
 .field label { font-size:.84rem; font-weight:700; color:var(--text-dark); }
 .field small { color:var(--text-muted); font-size:.76rem; line-height:1.5; }
-.field select, .field input[type=text], .field input[type=password] { border-radius:9px; border:1.5px solid var(--border); padding:.55rem .75rem; font:inherit; font-size:.85rem; background:#fff; color:var(--text-dark); }
+.field select, .field input[type=text], .field input[type=password], .field textarea { border-radius:9px; border:1.5px solid var(--border); padding:.55rem .75rem; font:inherit; font-size:.85rem; background:#fff; color:var(--text-dark); }
 .engine-list { list-style:none; display:grid; gap:6px; margin-bottom:1rem; }
 .engine-list li { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:.55rem .75rem; border:1px solid var(--border); border-radius:9px; font-size:.82rem; background:#fafafa; }
 .engine-list .engine-model { color:var(--text-muted); font-size:.75rem; }
@@ -373,7 +373,7 @@ body {
   <div class="history-section" id="history-section"></div>
 
   <!-- Footer -->
-  <div class="footer">Video2Doc v0.9.0 · 本机运行 · 任务结果保存到本地</div>
+  <div class="footer">Video2Doc v0.10.0 · 本机运行 · 任务结果保存到本地</div>
 
 </div>
 
@@ -411,6 +411,12 @@ body {
     <div class="privacy-options">
       <label class="privacy-option"><input type="checkbox" id="tr-enrichment" checked>尝试生成 AI 摘要、要点和标签</label>
       <div class="privacy-note" id="tr-enrichment-note">需配置 SiliconFlow Key；开启后最多发送 4000 字正文（长文稿取首/中/尾节选）进行<strong>云端增强</strong>，失败不影响原始转录与格式导出。</div>
+    </div>
+    <div class="privacy-options">
+      <label class="privacy-option"><input type="checkbox" id="tr-illustrated">生成图文稿：截取每张幻灯片 / 画面，配上当时说的原文</label>
+      <div class="privacy-note">适合讲座、教程、发布会。需要下载完整视频，耗时比仅转文字略长；输出可离线打开的 HTML 与 Markdown + 图片压缩包。</div>
+      <input class="form-control" id="tr-hotwords" maxlength="2000" placeholder="热词（可选）：人名、术语、产品名，逗号分隔，例如 京极彩, CEDEC, 狸克">
+      <div class="privacy-note">热词会交给豆包 / Whisper 优先识别；视频标题也会自动作为识别上下文。全局热词可在 ⚙️ 设置 → 模型 中配置。</div>
     </div>
     <div class="progress-steps" id="tr-steps">
       <div class="progress-step"><div class="step-icon">🔗</div><div class="step-label">解析链接</div><div class="step-status">等待中</div></div>
@@ -469,6 +475,12 @@ body {
         </div>
       </details>
     </div>
+    <div class="privacy-options">
+      <label class="privacy-option"><input type="checkbox" id="lo-illustrated">生成图文稿：截取每张幻灯片 / 画面，配上当时说的原文</label>
+      <div class="privacy-note">仅对视频文件生效；音频文件只输出文字稿。</div>
+      <input class="form-control" id="lo-hotwords" maxlength="2000" placeholder="热词（可选）：人名、术语、产品名，逗号分隔，例如 京极彩, CEDEC, 狸克">
+      <div class="privacy-note">热词会交给豆包 / Whisper 优先识别；视频标题也会自动作为识别上下文。全局热词可在 ⚙️ 设置 → 模型 中配置。</div>
+    </div>
     <div class="progress-steps" id="lo-steps">
       <div class="progress-step"><div class="step-icon">📤</div><div class="step-label">上传文件</div><div class="step-status">等待中</div></div>
       <div class="progress-step"><div class="step-icon">📝</div><div class="step-label">获取文字</div><div class="step-status">等待中</div></div>
@@ -522,6 +534,11 @@ body {
         <label for="opt-whisper-language">本地 Whisper 识别语言</label>
         <select id="opt-whisper-language"></select>
         <small>中文内容保持 zh；外语视频选对应语言，或 auto 自动识别。</small>
+      </div>
+      <div class="field">
+        <label for="opt-hotwords">常用热词（全局，所有任务都会使用）</label>
+        <textarea id="opt-hotwords" class="form-control" rows="3" maxlength="4000" placeholder="逗号或换行分隔，例如：动物森友会, 任天堂, CEDEC"></textarea>
+        <small>提高人名、术语的识别准确率（豆包 2.0 热词直传，最多 200 个；Whisper 作为提示词）。单个任务的热词可在转文稿窗口里填写。</small>
       </div>
       <button class="btn-solid" type="button" id="save-models-btn">保存模型设置</button>
       <div class="settings-msg" id="models-msg" role="status"></div>
@@ -688,7 +705,9 @@ async function startTranscribe(){
   const engine=document.getElementById('tr-engine').value;
   const enrichment=document.getElementById('tr-enrichment');
   const allowEnrichment=!enrichment.disabled&&enrichment.checked;
-  activeJob('tr','transcribe-online',{url:u,formats,engine,allow_enrichment:allowEnrichment},async result=>{
+  const hotwords=document.getElementById('tr-hotwords').value.trim();
+  const illustrated=document.getElementById('tr-illustrated').checked;
+  activeJob('tr','transcribe-online',{url:u,formats,engine,allow_enrichment:allowEnrichment,hotwords,illustrated},async result=>{
     await showTranscriptResult('tr',result,'btn-tr');
     loadHistory();
   });
@@ -875,6 +894,8 @@ async function startLocalTranscribe(){
     engine:document.getElementById('lo-engine').value,
     local_only:String(localOnly),
     allow_enrichment:String(allowEnrichment),
+    hotwords:document.getElementById('lo-hotwords').value.trim(),
+    illustrated:String(document.getElementById('lo-illustrated').checked),
   });
   // Stream the raw file: the server writes it to disk chunk by chunk.
   const token=++pollToken;
@@ -1099,6 +1120,7 @@ function renderOptionFields(){
   const options=settingsData.options||{}, choices=settingsData.choices||{};
   fillSelect(document.getElementById('opt-whisper-model'),choices.whisper_models||[],options.whisper_model&&options.whisper_model.value);
   fillSelect(document.getElementById('opt-whisper-language'),choices.whisper_languages||[],options.whisper_language&&options.whisper_language.value,{zh:'zh · 中文（默认）',auto:'auto · 自动识别',en:'en · 英语',ja:'ja · 日语',ko:'ko · 韩语',yue:'yue · 粤语'});
+  document.getElementById('opt-hotwords').value=String((options.hotwords&&options.hotwords.value)||'');
   document.getElementById('opt-auto-update').checked=!(options.auto_update_tools&&options.auto_update_tools.value===false);
   document.getElementById('opt-cookies-file').value=String((options.cookies_file&&options.cookies_file.value)||'');
   document.getElementById('opt-douyin-state').value=String((options.douyin_storage_state&&options.douyin_storage_state.value)||'');
@@ -1136,7 +1158,7 @@ async function loadModels(){
 async function saveModelOptions(){
   const select=document.getElementById('opt-enrich-model');
   const model=select.value==='__custom__'?document.getElementById('opt-enrich-custom').value.trim():select.value;
-  const result=await postJSON('/api/settings',{options:{enrich_model:model,whisper_model:document.getElementById('opt-whisper-model').value,whisper_language:document.getElementById('opt-whisper-language').value}});
+  const result=await postJSON('/api/settings',{options:{enrich_model:model,whisper_model:document.getElementById('opt-whisper-model').value,whisper_language:document.getElementById('opt-whisper-language').value,hotwords:document.getElementById('opt-hotwords').value}});
   if(!result.ok){setMsg('models-msg',result.data.error||'保存失败','bad');return}
   settingsData=result.data;renderOptionFields();setMsg('models-msg','已保存，新任务立即使用','ok');
 }

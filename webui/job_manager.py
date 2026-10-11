@@ -28,7 +28,8 @@ class JobType:
 class Job:
     def __init__(self, job_id=None, url="", job_type=JobType.TRANSCRIBE_ONLINE,
                  mode="transcript", formats=None, domain=None, engine="auto",
-                 local_only=False, allow_enrichment=True, job_dir=None):
+                 local_only=False, allow_enrichment=True, job_dir=None, hotwords=None,
+                 illustrated=False):
         self.id = job_id or uuid.uuid4().hex[:12]
         self.url = url
         self.type = job_type
@@ -38,6 +39,8 @@ class Job:
         self.engine = engine or "auto"  # auto|doubao|tele|funasr|whisper
         self.local_only = bool(local_only)
         self.allow_enrichment = bool(allow_enrichment)
+        self.hotwords = list(hotwords or [])
+        self.illustrated = bool(illustrated)  # also export slide images + 图文稿
         self.engine_used = ""            # 实际成功的引擎
         self.engine_note = ""            # 引擎切换提示（如"已自动切换到 tele"）
         self.status = "queued"
@@ -66,6 +69,7 @@ class Job:
             "mode": self.mode, "formats": self.formats, "domain": self.domain,
             "engine": self.engine, "local_only": self.local_only,
             "allow_enrichment": self.allow_enrichment,
+            "hotwords": self.hotwords, "illustrated": self.illustrated,
             "engine_used": self.engine_used, "engine_note": self.engine_note,
             "status": self.status, "progress": self.progress,
             "title": self.title, "duration": self.duration,

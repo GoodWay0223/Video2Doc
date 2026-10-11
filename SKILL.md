@@ -1065,7 +1065,16 @@ python video2doc.py meeting.m4a --local-only --format all
 
 # Download the video only; machine-readable result on stdout
 python video2doc.py --download "https://youtu.be/xxxx" --json
+
+# Lecture / tutorial → illustrated transcript (one frame per slide + its exact
+# narration, HTML + Markdown/images zip). Pass names and terms as hotwords.
+python video2doc.py "<URL>" --illustrated --format all --hotwords "人名,术语"
 ```
+
+Progress is printed to stderr; with `--json`, stdout contains only the result
+JSON. For learning material, prefer `--illustrated`; then proofread proper
+nouns against an authoritative source (official pages / articles) before
+publishing.
 
 ### Utility Scripts
 

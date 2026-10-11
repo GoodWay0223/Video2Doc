@@ -16,7 +16,7 @@ from pathlib import Path
 
 from scripts.platform_utils import load_user_config, save_user_config, user_config_path
 
-from .pipeline import DEFAULT_ENRICH_MODEL, WHISPER_MODELS
+from .pipeline import DEFAULT_ENRICH_MODEL, WHISPER_MODELS, parse_hotwords
 
 
 PROVIDERS = (
@@ -54,6 +54,7 @@ OPTION_FIELDS = {
     "cookies_file": {"env": "VIDEO2DOC_COOKIES_FILE", "default": ""},
     "douyin_storage_state": {"env": "VIDEO2DOC_DOUYIN_STORAGE_STATE", "default": ""},
     "auto_update_tools": {"env": None, "default": True},
+    "hotwords": {"env": None, "default": ""},
 }
 ENRICH_MODEL_PRESETS = (
     "deepseek-ai/DeepSeek-V3",
@@ -152,6 +153,10 @@ def _clean_option(field, value):
     elif field == "whisper_language":
         if value and value not in WHISPER_LANGUAGES:
             raise SettingsError("Whisper 语言无效")
+    elif field == "hotwords":
+        if len(value) > 4000:
+            raise SettingsError("热词总长度不能超过 4000 字符")
+        value = "，".join(parse_hotwords(value))
     elif field in {"cookies_file", "douyin_storage_state"}:
         if len(value) > 1024 or any(ord(ch) < 32 for ch in value):
             raise SettingsError("路径格式无效")

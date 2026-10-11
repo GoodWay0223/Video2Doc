@@ -189,6 +189,14 @@ def validate_engine(value):
     return engine
 
 
+def parse_hotwords_field(value):
+    if value is None:
+        return []
+    if not isinstance(value, (str, list)) or len(str(value)) > 4000:
+        raise RequestValidationError("hotwords 格式无效")
+    return pipeline.parse_hotwords(value)
+
+
 def parse_bool(value, field, default=False):
     """Parse a strict boolean from JSON booleans or multipart text fields."""
     if value is None:
@@ -478,6 +486,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 engine=engine,
                 local_only=local_only,
                 allow_enrichment=allow_enrichment,
+                hotwords=parse_hotwords_field(data.get("hotwords")),
+                illustrated=parse_bool(data.get("illustrated"), "illustrated", False),
             )
             job_manager.add_job(job)
             job_manager.submit(job, pipeline.run_transcribe_pipeline)
@@ -553,7 +563,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             raise RequestValidationError("需要 application/octet-stream 或 multipart/form-data")
 
     def _create_local_job(self, original_filename, formats_value, engine_value,
-                          local_only_value, allow_enrichment_value):
+                          local_only_value, allow_enrichment_value, hotwords_value=None,
+                          illustrated_value=None):
         formats = parse_formats(formats_value)
         engine = validate_engine(engine_value)
         local_only = parse_bool(local_only_value, "local_only", False)
@@ -572,6 +583,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             engine=engine,
             local_only=local_only,
             allow_enrichment=allow_enrichment,
+            hotwords=parse_hotwords_field(hotwords_value),
+            illustrated=parse_bool(illustrated_value, "illustrated", False),
         )
         job.local_filename = display_filename
 
@@ -608,7 +621,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             raise RequestValidationError("未收到文件")
         job, file_path = self._create_local_job(
             field("filename", ""), field("formats", "md"), field("engine", "auto"),
-            field("local_only", "false"), field("allow_enrichment", "true"))
+            field("local_only", "false"), field("allow_enrichment", "true"),
+            field("hotwords", ""), field("illustrated", "false"))
         partial = file_path.with_name(file_path.name + ".part")
         remaining = length
         try:
@@ -645,8 +659,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         parts = body.split(b"--" + boundary_bytes)
         file_data = None
         original_filename = None
-        fields = {"formats": "md", "engine": "auto",
-                  "local_only": "false", "allow_enrichment": "true"}
+        fields = {"formats": "md", "engine": "auto", "local_only": "false",
+                  "allow_enrichment": "true", "hotwords": "", "illustrated": "false"}
 
         for part in parts:
             separator = b"\r\n\r\n" if b"\r\n\r\n" in part else b"\n\n"
@@ -675,7 +689,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         job, file_path = self._create_local_job(
             original_filename, fields["formats"], fields["engine"],
-            fields["local_only"], fields["allow_enrichment"])
+            fields["local_only"], fields["allow_enrichment"], fields["hotwords"],
+            fields["illustrated"])
         file_path.write_bytes(file_data)
         self._start_local_job(job, file_path, len(file_data))
 
