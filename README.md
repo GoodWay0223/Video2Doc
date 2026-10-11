@@ -13,8 +13,8 @@
 
 前往 [GitHub Releases](https://github.com/GoodWay0223/Video2Doc/releases/latest)，优先下载：
 
-- `Video2Doc-v0.8.0.zip` — Windows/macOS 共用的跨平台源码包
-- `Video2Doc-v0.8.0.zip.sha256` — ZIP 的 SHA-256 校验值
+- `Video2Doc-v0.9.0.zip` — Windows/macOS 共用的跨平台源码包
+- `Video2Doc-v0.9.0.zip.sha256` — ZIP 的 SHA-256 校验值
 
 该 ZIP 不是 `.exe` 或 `.app` 安装包，仍需本机安装 Python 3.10+ 和 ffmpeg。GitHub 自动生成的 “Source code” 归档没有经过项目发布构建器的清理、清单与跨平台启动器检查，因此不作为首选下载。
 
@@ -103,12 +103,22 @@ python -m pip install -r requirements.txt
 python3 -m pip install -r requirements.txt
 ```
 
-yt-dlp 更新频繁。环境自检会显示当前版本并离线核对项目最低要求；需要联网查询最新稳定版时运行
-`python scripts/check_setup.py --check-updates`（macOS 使用 `python3`）。检测只提供升级命令，不会自动修改电脑环境。
+### 工具自动保持最新
 
-Web 首页也会显示 Python、FFmpeg、yt-dlp 和 JavaScript runtime 的本机版本。启动、自检和打开首页默认都不会联网检查更新；只有点击 **“联网检查最新版”** 或显式使用 `--check-updates` 时，才会向 PyPI 官方接口发送普通 HTTPS 版本查询。该请求不包含 API Key、媒体、文稿或本机路径。
+Video2Doc 默认**每天检查一次**依赖工具，并把可自动更新的工具升级到**最新稳定版**（Web UI 右上角 **⚙️ 设置 → 🔄 工具与更新** 可查看、手动更新或关闭自动更新）：
 
-Video2Doc 不会自动下载、安装、覆盖文件或执行升级命令。检测到版本过低或有新版时，自检会按实际安装形态给出 uv tool、pip 或独立版建议命令；由用户确认后自行执行。
+| 工具 | 检查来源 | 自动更新方式 |
+|------|----------|--------------|
+| yt-dlp（含 yt-dlp-ejs） | PyPI | `pip install --upgrade --no-cache-dir` 原地替换 |
+| Playwright + Chromium | PyPI | pip 升级后重新安装 Chromium，Playwright 自动删除不再使用的旧浏览器 |
+| openai-whisper / FunASR | PyPI | 仅在已安装时升级 |
+| FFmpeg | Windows：gyan.dev 官方构建（GitHub，带 SHA-256）；macOS：Homebrew | Windows 独立目录：下载校验后覆盖原目录；winget / Homebrew 安装：调用对应包管理器 |
+| Node.js、Python | nodejs.org、endoflife.date | 需要管理员权限，只显示升级命令 |
+
+- 只安装**发布满 7 天**的稳定版（预发布、已撤回版本一律跳过），避开刚发布就被撤回的问题版本；界面同时显示真正的最新版。
+- 升级是原地替换：pip 不写缓存，FFmpeg 直接覆盖原目录，不会在电脑上留下第二份。
+- 有任务正在运行时不更新；离线时不报错，下次再试。版本查询只访问公开的发布信息，不发送 Key、媒体、文稿或本机路径。
+- 命令行：`python scripts/tool_updates.py` 查看状态，加 `--update` 立即更新。
 
 仓库侧由 Dependabot 每周检查 yt-dlp 稳定版并提升 `requirements.txt` 的已测试最低基线；计划任务同时在 Windows/macOS、Python 3.10/3.12/3.14 上重新安装当时的最新稳定版并运行完整 CI。更新只会形成待审查的 PR，不会绕过测试直接发布。
 
@@ -125,23 +135,20 @@ python -m playwright install chromium
 
 ### 第四步：配置云端 API Key（至少一种）
 
-云端优先级：**豆包录音文件识别 2.0 → SiliconFlow TeleSpeechASR**。FunASR / Whisper 只是可选的本地后备，不是必装项。
+最简单的方式：启动后点页面右上角 **⚙️ 设置 → 🔑 API Key**。每个服务商都有 **“获取 Key ↗”** 直达链接、输入框、**验证**（只把 Key 发给该服务商做一次无害查询）、**保存**和**清除**按钮。
 
-- [豆包语音 API Key 管理](https://console.volcengine.com/speech/new/setting/apikeys) → 配置名 `DOUBAO_API_KEY`
-- [SiliconFlow API Key 管理](https://cloud.siliconflow.cn/account/ak) → 配置名 `SILICONFLOW_API_KEY`
+| 服务商 | 用途 | 获取地址 | 环境变量 |
+|--------|------|----------|----------|
+| 豆包语音（火山引擎） | 语音识别首选：豆包录音文件识别 2.0 | [控制台 API Key](https://console.volcengine.com/speech/new/setting/apikeys) | `DOUBAO_API_KEY` |
+| 硅基流动 SiliconFlow | 语音识别备选：TeleSpeechASR；AI 摘要/要点/标签 | [API 密钥](https://cloud.siliconflow.cn/account/ak) | `SILICONFLOW_API_KEY` |
 
-不要把真实 Key 写进仓库或聊天记录。仓库中的 `.env.example` 只列变量名，不包含真实值。
+- Key 只保存在本机 `~/.video2doc/config.json`（UTF-8，尽量限制为仅当前用户可读），页面上只显示掩码，接口永远不回传明文。
+- 同名环境变量优先于设置页保存的值，方便脚本化部署。
+- 修改设置只允许在运行 Video2Doc 的这台电脑上进行；即使用 `--host 0.0.0.0` 共享到局域网，其他设备也不能读写 Key。
+- **⚙️ 设置 → 🧠 模型**：AI 摘要模型会列出你的硅基流动账号实际可用的对话模型（默认 `deepseek-ai/DeepSeek-V3`，也可填自定义 ID）；本地 Whisper 的模型与语言也在这里选。
+- **⚙️ 设置 → 🍪 登录态**：可选的 cookies.txt、抖音 storage_state 和小红书 Cookie。
 
-```bash
-# 环境变量示例
-# Mac/Linux:
-export DOUBAO_API_KEY=your-key
-export SILICONFLOW_API_KEY=sk-xxxxx
-
-# Windows PowerShell（仅当前窗口）:
-$env:DOUBAO_API_KEY="your-key"
-$env:SILICONFLOW_API_KEY="sk-xxxxx"
-```
+FunASR / Whisper 只是可选的本地后备，不是必装项。不要把真实 Key 写进仓库或聊天记录。
 
 ### 第五步：运行环境检查
 
@@ -317,10 +324,10 @@ python3 scripts/check_setup.py
 
 ### 从 v0.7.x 或更早版本升级
 
-1. 下载新的 `Video2Doc-v0.8.0.zip`，解压到新目录；不要直接覆盖正在运行的旧目录。
+1. 下载新的 `Video2Doc-v0.9.0.zip`，解压到新目录；不要直接覆盖正在运行的旧目录。
 2. API Key 继续使用系统环境变量或 `~/.video2doc/config.json`，发布包不包含任何凭据。
 3. 如需保留旧任务，请单独备份旧目录中的 `output/`；新发布包不会包含运行产物。
-4. 重新运行 `python -m pip install -r requirements.txt` 和环境自检，再启动 v0.8.0。
+4. 重新运行 `python -m pip install -r requirements.txt` 和环境自检，再启动 v0.9.0。
 5. v0.6.0 起默认只监听 `127.0.0.1`。如过去依赖局域网访问，需要显式传入 `--host 0.0.0.0`；该模式当前没有认证或 HTTPS，不适合敏感文件。
 
 ### 验证 SHA-256
@@ -328,15 +335,15 @@ python3 scripts/check_setup.py
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\Video2Doc-v0.8.0.zip -Algorithm SHA256
-Get-Content .\Video2Doc-v0.8.0.zip.sha256
+Get-FileHash .\Video2Doc-v0.9.0.zip -Algorithm SHA256
+Get-Content .\Video2Doc-v0.9.0.zip.sha256
 ```
 
 macOS：
 
 ```bash
-shasum -a 256 Video2Doc-v0.8.0.zip
-cat Video2Doc-v0.8.0.zip.sha256
+shasum -a 256 Video2Doc-v0.9.0.zip
+cat Video2Doc-v0.9.0.zip.sha256
 ```
 
 两边的哈希值必须完全一致。ZIP 内还包含 `RELEASE-MANIFEST.json`，列出每个源码文件的大小与 SHA-256。

@@ -124,6 +124,12 @@ def get_history(limit=20):
         return [jobs[jid].to_dict() for jid in sorted_ids[:limit]]
 
 
+def has_active_jobs():
+    with jobs_lock:
+        running = any(job.status not in FINISHED_STATUSES for job in jobs.values())
+    return running or not _queue.empty()
+
+
 def load_history(output_dir=None):
     """Restore finished jobs from output/*/job.json after a restart.
 

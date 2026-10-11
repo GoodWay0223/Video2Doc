@@ -86,7 +86,7 @@ def _download_xhs_initial_state(url, raw_dir, job):
     UA = ("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
           "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1")
     curl = find_executable(["curl", "curl.exe"]) or "curl"
-    cookie = os.environ.get("XHS_COOKIE", "")
+    cookie = os.environ.get("XHS_COOKIE", "") or str(_read_config().get("xhs_cookie", "") or "")
     try:
         # 1) 抓页面（移动端 UA + Referer，可选 cookie）
         hdr = ["-H", f"User-Agent: {UA}", "-H", "Referer: https://www.xiaohongshu.com/"]

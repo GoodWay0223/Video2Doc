@@ -12,6 +12,8 @@ Three core functions:
 import argparse
 import http.server
 import sys
+import threading
+import time
 from webui import __version__, job_manager
 from webui.server import Handler, allowed_hosts_for
 
@@ -28,6 +30,20 @@ def configure_console_encoding():
                 reconfigure(encoding="utf-8", errors="replace")
             except (LookupError, OSError):
                 pass
+
+def auto_update_loop():
+    """Keep tools on their latest stable release (daily; never while a job runs)."""
+    from scripts import tool_updates
+    time.sleep(10)
+    while True:
+        try:
+            updated = tool_updates.maybe_auto_update(job_manager.has_active_jobs)
+            if updated:
+                print(f"  🔄 已自动更新：{', '.join(updated)}（可在 设置 → 工具与更新 查看）")
+        except Exception as exc:  # Updates are best-effort and must never stop the server.
+            print(f"  ⚠️ 工具自动更新检查失败：{type(exc).__name__}")
+        time.sleep(3600)
+
 
 def main():
     configure_console_encoding()
@@ -66,6 +82,7 @@ def main():
     restored = job_manager.load_history()
     if restored:
         print(f"  已恢复 {restored} 条历史任务（output/ 目录）")
+    threading.Thread(target=auto_update_loop, name="video2doc-tool-updates", daemon=True).start()
     print(f"""
 ╔══════════════════════════════════════════╗
 ║   🎬 Video2Doc 工坊 v{__version__:<20}║

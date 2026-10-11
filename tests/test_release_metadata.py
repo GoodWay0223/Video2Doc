@@ -39,7 +39,7 @@ class ReleaseMetadataTests(unittest.TestCase):
         self.assertIn('dependency-name: "yt-dlp"', dependabot)
         self.assertIn('versioning-strategy: "increase"', dependabot)
         self.assertRegex(workflow, r"(?m)^\s+schedule:\s*$")
-        self.assertRegex(requirements, r"(?m)^yt-dlp>=\d+\.\d+\.\d+\s*$")
+        self.assertRegex(requirements, r"(?m)^yt-dlp(\[default\])?>=\d+\.\d+\.\d+\s*$")
 
 
 if __name__ == "__main__":

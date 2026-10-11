@@ -30,6 +30,54 @@ def load_user_config():
     return {}
 
 
+def _write_private_json(path, payload):
+    """Atomically write JSON readable only by the current user where supported."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(path.name + ".part")
+    partial.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                       encoding="utf-8", newline="\n")
+    try:
+        os.chmod(partial, 0o600)
+    except OSError:
+        pass
+    partial.replace(path)
+
+
+def save_user_config(updates):
+    """Merge updates into config.json; None or "" removes a key. Unknown keys are kept."""
+    config = load_user_config()
+    for key, value in updates.items():
+        if value is None or value == "":
+            config.pop(key, None)
+        else:
+            config[key] = value
+    _write_private_json(user_config_path(), config)
+    return config
+
+
+def state_path():
+    return Path.home() / ".video2doc" / "state.json"
+
+
+def load_state():
+    try:
+        payload = json.loads(state_path().read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else {}
+    except (OSError, RuntimeError, ValueError):
+        return {}
+
+
+def save_state(updates):
+    state = load_state()
+    state.update(updates)
+    try:
+        _write_private_json(state_path(), state)
+    except OSError:
+        pass
+    return state
+
+
 def candidate_bin_dirs(*, os_name=None, platform_name=None, environ=None,
                        home=None, python_executable=None):
     """Return common executable directories that may be absent from app PATH."""

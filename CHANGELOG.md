@@ -4,6 +4,24 @@
 
 暂无。
 
+## [v0.9.0] — 2026-10-11
+
+### Added
+- Web UI 新增 **⚙️ 设置**：
+  - **API Key**：豆包 / 硅基流动各有“获取 Key ↗”直达链接、输入、验证（向服务商发一次无害查询）、保存与清除；只保存在本机 `~/.video2doc/config.json`，接口只返回掩码，环境变量仍优先。
+  - **模型**：AI 摘要模型可从硅基流动账号的实际可用模型中选择或自定义；本地 Whisper 模型与识别语言可选；列出各识别引擎使用的具体模型与就绪状态。
+  - **工具与更新**：显示 yt-dlp、FFmpeg、Playwright、Whisper、FunASR、Node.js、Python 的当前版本与最新稳定版，一键更新。
+  - **登录态（可选）**：cookies.txt、抖音 storage_state、小红书 Cookie。
+- 工具自动保持最新（默认开启、可关闭）：每天检查一次，只安装发布满 7 天的稳定版，原地替换不留旧副本（pip `--no-cache-dir`、FFmpeg 覆盖原目录、Playwright 自动清理旧浏览器）；有任务运行时不更新。命令行 `python scripts/tool_updates.py [--update]`。
+- Windows 独立目录的 FFmpeg 可从 gyan.dev 官方构建自动更新（GitHub 发布附带 SHA-256，下载后校验）；winget / Homebrew 安装调用对应包管理器。
+
+### Changed
+- `requirements.txt` 改为 `yt-dlp[default]`，一并安装 YouTube JavaScript 校验所需的 `yt-dlp-ejs`。
+- 首页状态栏新增“🔑 配置 Key”“🔄 工具更新”入口，未配置识别引擎时直接引导到设置。
+
+### Security
+- 设置与工具更新接口只接受来自本机的请求（局域网共享模式下其他设备也无法读写 Key 或触发更新），并沿用 Host / Origin 校验。
+
 ## [v0.8.0] — 2026-10-11
 
 ### Added

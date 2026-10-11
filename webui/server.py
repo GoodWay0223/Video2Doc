@@ -6,7 +6,9 @@ import shutil
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import __version__, job_manager, pipeline, templates
+from scripts import tool_updates
+
+from . import __version__, job_manager, pipeline, settings, templates
 
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
@@ -424,6 +426,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._send_json(get_public_capabilities(check_updates=True))
             return
 
+        if path == "/api/settings":
+            self._send_json(settings.public_settings())
+            return
+
+        if path == "/api/settings/models":
+            self._send_json(settings.enrich_models())
+            return
+
+        if path == "/api/tools":
+            refresh = parse_qs(parsed.query).get("refresh") == ["1"]
+            self._send_json(tool_updates.snapshot(refresh=refresh))
+            return
+
         self._send_json({"error": "未找到"}, 404)
 
     # ─── POST ──────────────────────────────
@@ -497,7 +512,36 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._handle_local_upload()
             return
 
+        if path in ("/api/settings", "/api/settings/verify", "/api/tools/update"):
+            # Keys and software updates are managed only from this computer,
+            # even when the UI is shared on the LAN with --host 0.0.0.0.
+            if not self._client_is_local():
+                raise RequestValidationError("只能在运行 Video2Doc 的电脑上修改设置", 403)
+            data = self._read_json()
+            try:
+                if path == "/api/settings":
+                    self._send_json(settings.update_settings(data))
+                elif path == "/api/settings/verify":
+                    provider = optional_string(data, "provider", "", 32)
+                    key = optional_string(data, "key", None, 4096)
+                    self._send_json(settings.verify_key(provider, key))
+                else:
+                    component = optional_string(data, "id", "", 32)
+                    if component not in tool_updates.COMPONENT_IDS:
+                        raise RequestValidationError("未知组件")
+                    started = tool_updates.start_update(component)
+                    self._send_json({"started": started,
+                                     **({} if started else {"error": "已有更新任务在运行"})},
+                                    200 if started else 409)
+            except settings.SettingsError as exc:
+                raise RequestValidationError(str(exc)) from None
+            return
+
         self._send_json({"error": "未找到"}, 404)
+
+    def _client_is_local(self):
+        host = str((getattr(self, "client_address", None) or ("127.0.0.1",))[0])
+        return host in LOOPBACK_HOSTS or host.startswith("127.") or host == "::ffff:127.0.0.1"
 
     def _handle_local_upload(self):
         content_type = self.headers.get("Content-Type", "").lower()

@@ -58,17 +58,24 @@ class FrontendTruthfulnessTests(unittest.TestCase):
             with self.subTest(documented_contract=documented_contract):
                 self.assertIn(documented_contract, self.readme)
 
-    def test_component_update_check_is_explicit_and_never_auto_upgrades(self):
+    def test_tool_updates_are_visible_and_can_be_turned_off(self):
         for visible_contract in (
-            'id="runtime-update-btn"', "/api/component-updates",
-            "联网检查最新版", "本机版本为离线读取", "不会自动升级",
-            "低于最低要求", "请手动更新",
+            'id="runtime-update-btn"', "/api/tools", "/api/tools/update",
+            'id="opt-auto-update"', "只安装发布满", "不保留重复副本",
+            "需要管理员权限", "低于最低要求", "请手动更新",
         ):
             with self.subTest(visible_contract=visible_contract):
                 self.assertIn(visible_contract, self.html)
 
-        self.assertNotIn("yt-dlp -U", self.html)
-        self.assertNotIn("pip install --upgrade", self.html)
+    def test_settings_expose_key_links_without_echoing_secrets(self):
+        for visible_contract in (
+            'id="modal-settings"', "/api/settings", "/api/settings/verify",
+            "/api/settings/models", "获取 Key ↗", "只保存在本机",
+            'rel:\'noopener noreferrer\'', "type:'password'",
+        ):
+            with self.subTest(visible_contract=visible_contract):
+                self.assertIn(visible_contract, self.html)
+        self.assertNotIn("innerHTML", self.html)
 
 
 if __name__ == "__main__":

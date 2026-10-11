@@ -68,10 +68,14 @@ Never search memory files or unrelated project files for credentials.
 - 选项 D：用本地 Whisper → 多语言兜底，CPU 推理较慢，~1.5GB 模型
 ```
 
-**Step 3: Store the key only with explicit user authorization.** Prefer the
-operating-system environment or `~/.video2doc/config.json`:
+**Step 3: Store the key only with explicit user authorization.** The easiest
+path for the user is the Web UI: `python webui.py` → **⚙️ 设置 → 🔑 API Key**
+(get-key links, verify, save, clear; stored only in `~/.video2doc/config.json`,
+never echoed back). Otherwise use the operating-system environment or write
+`~/.video2doc/config.json` (UTF-8):
 ```
-{"doubao_api_key": "...", "siliconflow_api_key": "..."}
+{"doubao_api_key": "...", "siliconflow_api_key": "...",
+ "enrich_model": "deepseek-ai/DeepSeek-V3", "auto_update_tools": true}
 ```
 
 **Step 4: Confirm ready.** Once key is stored or user chooses local, confirm and

@@ -226,6 +226,59 @@ body {
 /* ─── Footer ────────────────────────── */
 .footer { text-align:center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-light); font-size: .82rem; }
 
+/* ─── Settings ──────────────────────── */
+.hero-settings-btn { position:absolute; top:14px; right:14px; z-index:3; border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.14); color:#fff; border-radius:10px; padding:.45rem .8rem; font:inherit; font-size:.82rem; font-weight:600; cursor:pointer; backdrop-filter:blur(6px); }
+.hero-settings-btn:hover { background:rgba(255,255,255,.26); }
+.runtime-actions { display:flex; flex-direction:column; gap:6px; flex:0 0 auto; }
+.modal-header.st { background: linear-gradient(135deg, #334155, #475569); }
+.modal-panel.wide { max-width:760px; }
+.settings-tabs { display:flex; gap:4px; border-bottom:2px solid var(--border); margin-bottom:1rem; overflow-x:auto; }
+.settings-tab { padding:.55rem .9rem; border:none; background:none; font:inherit; font-size:.85rem; font-weight:600; color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; white-space:nowrap; }
+.settings-tab.active { color:#334155; border-bottom-color:#334155; }
+.settings-pane { display:none; }
+.settings-pane.active { display:block; }
+.settings-note { color:var(--text-muted); font-size:.8rem; line-height:1.6; margin-bottom:.9rem; }
+.settings-note code { background:#f1f5f9; padding:1px 5px; border-radius:4px; font-size:.76rem; }
+.provider-card { border:1px solid var(--border); border-radius:12px; padding:1rem; margin-bottom:.9rem; background:#fff; }
+.provider-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:.5rem; }
+.provider-name { font-weight:700; color:var(--text-dark); font-size:.95rem; }
+.chip { display:inline-block; padding:3px 9px; border-radius:999px; font-size:.72rem; font-weight:600; background:#f1f5f9; color:#475569; }
+.chip.ok { background:#d1fae5; color:#047857; }
+.chip.warn { background:#fef3c7; color:#92400e; }
+.chip.bad { background:#fee2e2; color:#b91c1c; }
+.provider-uses { margin:0 0 .7rem 1.1rem; color:var(--text-muted); font-size:.8rem; line-height:1.6; }
+.key-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.key-row .form-control { flex:1 1 260px; padding:.6rem .8rem; font-size:.85rem; font-family:Consolas,'Courier New',monospace; }
+.btn-ghost { border:1.5px solid var(--border); background:#fff; color:#334155; border-radius:9px; padding:.5rem .85rem; font:inherit; font-size:.8rem; font-weight:600; cursor:pointer; text-decoration:none; white-space:nowrap; }
+.btn-ghost:hover { border-color:#94a3b8; }
+.btn-ghost:disabled { opacity:.5; cursor:not-allowed; }
+.btn-solid { border:none; background:#334155; color:#fff; border-radius:9px; padding:.55rem .95rem; font:inherit; font-size:.8rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn-solid:hover { background:#1e293b; }
+.btn-solid:disabled { opacity:.5; cursor:not-allowed; }
+.settings-msg { min-height:1.2em; margin-top:.5rem; font-size:.78rem; color:var(--text-muted); }
+.settings-msg.ok { color:#047857; }
+.settings-msg.bad { color:#b91c1c; }
+.field { display:grid; gap:5px; margin-bottom:.9rem; }
+.field label { font-size:.84rem; font-weight:700; color:var(--text-dark); }
+.field small { color:var(--text-muted); font-size:.76rem; line-height:1.5; }
+.field select, .field input[type=text], .field input[type=password] { border-radius:9px; border:1.5px solid var(--border); padding:.55rem .75rem; font:inherit; font-size:.85rem; background:#fff; color:var(--text-dark); }
+.engine-list { list-style:none; display:grid; gap:6px; margin-bottom:1rem; }
+.engine-list li { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:.55rem .75rem; border:1px solid var(--border); border-radius:9px; font-size:.82rem; background:#fafafa; }
+.engine-list .engine-model { color:var(--text-muted); font-size:.75rem; }
+.tools-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+.tools-table th, .tools-table td { text-align:left; padding:.5rem .4rem; border-bottom:1px solid var(--border); vertical-align:top; }
+.tools-table th { color:var(--text-muted); font-weight:600; font-size:.75rem; }
+.tools-table .tool-role { display:block; color:var(--text-light); font-size:.72rem; }
+.tools-table .tool-hint { display:block; color:var(--text-muted); font-size:.7rem; overflow-wrap:anywhere; max-width:220px; }
+.switch-row { display:flex; align-items:center; gap:8px; font-size:.84rem; font-weight:600; color:var(--text-dark); margin-bottom:.6rem; cursor:pointer; }
+.switch-row input { width:16px; height:16px; accent-color:#334155; }
+.toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:.8rem; }
+@media (max-width:768px) {
+  .hero-settings-btn { top:10px; right:10px; padding:.35rem .6rem; }
+  .tools-table .tool-hint { max-width:none; }
+  .tools-table th:nth-child(3), .tools-table td:nth-child(3) { display:none; }
+}
+
 /* ─── Animations ────────────────────── */
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 @keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
@@ -264,6 +317,7 @@ body {
 
   <!-- Hero -->
   <div class="hero-section">
+    <button class="hero-settings-btn" type="button" data-open-settings="keys" aria-label="打开设置">⚙️ 设置</button>
     <div class="hero-wave" id="hero-wave"></div>
     <h1 class="hero-title">🎬 Video2Doc · 视频下载与转文稿</h1>
     <p class="hero-subtitle">下载平台视频，或将视频链接与本地音视频转为文稿</p>
@@ -276,8 +330,11 @@ body {
 
   <div class="runtime-status" id="runtime-status" role="status" aria-live="polite">
     <span class="runtime-dot" aria-hidden="true"></span>
-    <span class="runtime-copy"><span id="runtime-status-text">正在检查本机能力…</span><span class="runtime-components" id="runtime-components-text">版本读取默认离线；不会自动升级。</span></span>
-    <button class="runtime-update-btn" id="runtime-update-btn" type="button" title="仅向 PyPI 官方接口查询 yt-dlp 最新稳定版，不会执行升级">联网检查最新版</button>
+    <span class="runtime-copy"><span id="runtime-status-text">正在检查本机能力…</span><span class="runtime-components" id="runtime-components-text">正在读取本机工具版本…</span></span>
+    <span class="runtime-actions">
+      <button class="runtime-update-btn" id="runtime-settings-btn" type="button" data-open-settings="keys">🔑 配置 Key</button>
+      <button class="runtime-update-btn" id="runtime-update-btn" type="button" data-open-settings="tools">🔄 工具更新</button>
+    </span>
   </div>
 
   <!-- Section Title -->
@@ -316,7 +373,7 @@ body {
   <div class="history-section" id="history-section"></div>
 
   <!-- Footer -->
-  <div class="footer">Video2Doc v0.8.0 · 本机运行 · 任务结果保存到本地</div>
+  <div class="footer">Video2Doc v0.9.0 · 本机运行 · 任务结果保存到本地</div>
 
 </div>
 
@@ -428,10 +485,81 @@ body {
   </div>
 </div></div>
 
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<!-- MODAL: Settings                                                    -->
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="modal-overlay" id="modal-settings">
+<div class="modal-panel wide">
+  <div class="modal-header st"><h3>⚙️ 设置</h3><button class="modal-close" type="button" aria-label="关闭">×</button></div>
+  <div class="modal-body">
+    <div class="settings-tabs" role="tablist">
+      <button class="settings-tab active" type="button" data-settings-tab="keys">🔑 API Key</button>
+      <button class="settings-tab" type="button" data-settings-tab="models">🧠 模型</button>
+      <button class="settings-tab" type="button" data-settings-tab="tools">🔄 工具与更新</button>
+      <button class="settings-tab" type="button" data-settings-tab="advanced">🍪 登录态（可选）</button>
+    </div>
+
+    <div class="settings-pane active" id="settings-pane-keys">
+      <p class="settings-note">至少配置一个云端 Key 即可识别无字幕视频；有平台字幕的链接无需 Key。Key 只保存在本机 <code id="settings-config-path">~/.video2doc/config.json</code>，只会发送给对应服务商；同名环境变量优先生效。</p>
+      <div id="provider-list"></div>
+    </div>
+
+    <div class="settings-pane" id="settings-pane-models">
+      <p class="settings-note">识别引擎在“链接转文稿 / 本地文件”里选择；“自动”会按下面顺序尝试已就绪的引擎。</p>
+      <ul class="engine-list" id="engine-list"></ul>
+      <div class="field">
+        <label for="opt-enrich-model">AI 摘要 / 要点 / 标签使用的模型（硅基流动）</label>
+        <select id="opt-enrich-model"></select>
+        <input type="text" id="opt-enrich-custom" placeholder="自定义模型 ID，例如 Qwen/Qwen3-32B" style="display:none">
+        <small id="opt-enrich-note">仅在勾选“AI 摘要”时，把最多 4000 字文稿节选发送给该模型。</small>
+      </div>
+      <div class="field">
+        <label for="opt-whisper-model">本地 Whisper 模型</label>
+        <select id="opt-whisper-model"></select>
+        <small>越大越准、越慢；turbo 速度与准确度平衡（首次使用会下载模型）。</small>
+      </div>
+      <div class="field">
+        <label for="opt-whisper-language">本地 Whisper 识别语言</label>
+        <select id="opt-whisper-language"></select>
+        <small>中文内容保持 zh；外语视频选对应语言，或 auto 自动识别。</small>
+      </div>
+      <button class="btn-solid" type="button" id="save-models-btn">保存模型设置</button>
+      <div class="settings-msg" id="models-msg" role="status"></div>
+    </div>
+
+    <div class="settings-pane" id="settings-pane-tools">
+      <label class="switch-row"><input type="checkbox" id="opt-auto-update">自动保持工具为最新稳定版（每天检查一次，有任务运行时不更新）</label>
+      <p class="settings-note">只安装发布满 <span id="tools-age">7</span> 天的稳定版；原地替换旧版本，不保留重复副本。Python、Node.js 等系统级软件需要管理员权限，这里只给出升级命令。</p>
+      <div class="toolbar"><button class="btn-solid" type="button" id="tools-check-btn">立即检查</button><span class="settings-msg" id="tools-msg" role="status"></span></div>
+      <table class="tools-table"><thead><tr><th>工具</th><th>当前</th><th>最新稳定版</th><th>状态</th></tr></thead><tbody id="tools-body"><tr><td colspan="4">正在读取…</td></tr></tbody></table>
+    </div>
+
+    <div class="settings-pane" id="settings-pane-advanced">
+      <p class="settings-note">公开视频通常不需要登录态。只有登录画质、受限内容或平台风控时才需要；文件需自行从浏览器导出，Video2Doc 不会读取正在运行的浏览器。</p>
+      <div class="field">
+        <label for="opt-cookies-file">cookies.txt 路径（B站 / 抖音 / YouTube 通用）</label>
+        <input type="text" id="opt-cookies-file" placeholder="例如 C:\Users\me\cookies.txt">
+        <small>Netscape 格式，可用浏览器扩展 “Get cookies.txt LOCALLY” 导出。</small>
+      </div>
+      <div class="field">
+        <label for="opt-douyin-state">抖音 Playwright storage_state 路径</label>
+        <input type="text" id="opt-douyin-state" placeholder="例如 C:\Users\me\douyin_state.json">
+      </div>
+      <div class="field">
+        <label for="opt-xhs-cookie">小红书 Cookie（遇到风控时填写）</label>
+        <input type="password" id="opt-xhs-cookie" placeholder="留空表示不修改" autocomplete="off">
+        <small id="opt-xhs-status">未设置</small>
+      </div>
+      <div class="key-row"><button class="btn-solid" type="button" id="save-advanced-btn">保存</button><button class="btn-ghost" type="button" id="clear-xhs-btn">清除小红书 Cookie</button></div>
+      <div class="settings-msg" id="advanced-msg" role="status"></div>
+    </div>
+  </div>
+</div></div>
+
 <script>
 let activePoll=null, pollToken=0, activeUpload=null, localFile=null, runtimeCapabilities=null;
 function maxUploadBytes(){const v=runtimeCapabilities&&Number(runtimeCapabilities.max_upload_bytes);return v>0?v:4*1024*1024*1024}
-function stopPolling(){pollToken++;if(activePoll){clearTimeout(activePoll);activePoll=null}if(activeUpload){activeUpload.abort();activeUpload=null}}
+function stopPolling(){pollToken++;if(typeof toolsPoll!=='undefined'&&toolsPoll){clearTimeout(toolsPoll);toolsPoll=null}if(activePoll){clearTimeout(activePoll);activePoll=null}if(activeUpload){activeUpload.abort();activeUpload=null}}
 const engineLabels={doubao:'豆包 2.0',tele:'TeleSpeechASR',funasr:'本地 FunASR',whisper:'本地 Whisper'};
 
 // Signature: build hero waveform bars
@@ -695,21 +823,19 @@ function renderComponentVersions(data,checkedOnline=false){
   }else{
     parts.push('未检测到 JavaScript runtime（部分 YouTube 视频可能受限）');
   }
-  parts.push(checkedOnline?'联网检查只读取官方版本信息，不会自动升级':'本机版本为离线读取；点击右侧按钮才会联网');
+  parts.push('工具版本可在「🔄 工具更新」中检查并一键升级');
   output.textContent=parts.join(' · ');
 }
-async function loadCapabilities(checkUpdates=false){
+async function loadCapabilities(){
   const status=document.getElementById('runtime-status');
   const statusText=document.getElementById('runtime-status-text');
-  const updateButton=document.getElementById('runtime-update-btn');
-  if(checkUpdates){updateButton.disabled=true;updateButton.textContent='正在检查…'}
   try{
-    const response=await fetch(checkUpdates?'/api/component-updates':'/api/capabilities');
+    const response=await fetch('/api/capabilities');
     if(!response.ok)throw new Error('capabilities unavailable');
     const data=await response.json();
     if(!data||typeof data!=='object'||!data.engines)throw new Error('invalid capabilities');
     runtimeCapabilities=data;
-    renderComponentVersions(data,checkUpdates);
+    renderComponentVersions(data,false);
     syncEngineSelect('tr-engine');
     syncOnlineEnrichmentOption();
     syncLocalPrivacyOptions();
@@ -721,7 +847,7 @@ async function loadCapabilities(checkUpdates=false){
       statusText.textContent=`下载工具已就绪 · 识别环境已配置但未实际验证：${names.join('、')}`;
     }else if(data.download_tools_ready){
       status.classList.add('warn');
-      statusText.textContent='下载工具已就绪 · 语音识别尚未配置；带平台字幕的链接仍可生成文稿，无字幕时请配置豆包或 SiliconFlow Key。';
+      statusText.textContent='下载工具已就绪 · 语音识别尚未配置；带平台字幕的链接仍可生成文稿，无字幕时请点「🔑 配置 Key」填写豆包或硅基流动 Key。';
     }else if(data.transcription_configured){
       status.classList.add('warn');
       statusText.textContent=`识别环境已配置但未实际验证（${names.join('、')}）· 视频下载工具尚未完整安装。`;
@@ -730,16 +856,8 @@ async function loadCapabilities(checkUpdates=false){
       statusText.textContent='下载工具尚未完整安装，且语音识别尚未配置；请先完成环境配置。';
     }
   }catch(error){
-    if(checkUpdates&&runtimeCapabilities){
-      renderComponentVersions(runtimeCapabilities,false);
-      document.getElementById('runtime-components-text').textContent+=' · 联网检查失败，请稍后重试。';
-      return;
-    }
     status.classList.add('warn');
     statusText.textContent='无法读取本机能力状态；请运行 python scripts/check_setup.py 检查环境。';
-  }finally{
-    updateButton.disabled=false;
-    updateButton.textContent=checkUpdates?'重新检查最新版':'联网检查最新版';
   }
 }
 async function startLocalTranscribe(){
@@ -886,7 +1004,206 @@ async function viewHistory(jobId,type){
   }catch(e){showError(prefix,'无法读取历史任务')}
 }
 
+// ─── Settings ─────────────────────────
+let settingsData=null, toolsPoll=null;
+const statusLabels={up_to_date:['已是最新','ok'],update_available:['可更新','warn'],newer:['比稳定版更新','ok'],not_installed:['未安装',''],unknown:['未知','']};
+function el(tag,props={},...children){
+  const node=document.createElement(tag);
+  Object.entries(props).forEach(([key,value])=>{
+    if(key==='class')node.className=value;
+    else if(key==='text')node.textContent=value;
+    else if(key.startsWith('on'))node.addEventListener(key.slice(2),value);
+    else node.setAttribute(key,value);
+  });
+  children.flat().forEach(child=>{if(child!==null&&child!==undefined)node.append(child)});
+  return node;
+}
+function setMsg(id,text,kind=''){const node=document.getElementById(id);if(!node)return;node.textContent=text||'';node.className='settings-msg'+(kind?' '+kind:'')}
+async function postJSON(url,body){
+  try{
+    const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    let data={};try{data=await response.json()}catch(e){}
+    return {ok:response.ok&&!data.error,data};
+  }catch(e){return {ok:false,data:{error:'连接失败'}}}
+}
+function openSettings(tab='keys'){
+  openModal('settings');
+  switchSettingsTab(tab);
+  loadSettings();
+}
+function switchSettingsTab(tab){
+  document.querySelectorAll('[data-settings-tab]').forEach(button=>button.classList.toggle('active',button.dataset.settingsTab===tab));
+  document.querySelectorAll('.settings-pane').forEach(pane=>pane.classList.toggle('active',pane.id==='settings-pane-'+tab));
+  if(tab==='tools')loadTools(false);
+  if(tab==='models')loadModels();
+}
+async function loadSettings(){
+  try{
+    const response=await fetch('/api/settings');
+    settingsData=await response.json();
+  }catch(e){setMsg('models-msg','无法读取设置','bad');return}
+  document.getElementById('settings-config-path').textContent=String(settingsData.config_path||'~/.video2doc/config.json');
+  renderProviders();
+  renderOptionFields();
+}
+function sourceChip(status){
+  if(!status||!status.configured)return el('span',{class:'chip warn',text:'未配置'});
+  if(status.source==='env')return el('span',{class:'chip ok',text:`环境变量 ${status.env} · ${status.preview}`});
+  return el('span',{class:'chip ok',text:`已保存在本机 · ${status.preview}`});
+}
+function renderProviders(){
+  const list=document.getElementById('provider-list');
+  list.replaceChildren();
+  (settingsData.providers||[]).forEach(provider=>{
+    const input=el('input',{class:'form-control',type:'password',autocomplete:'off',spellcheck:'false',placeholder:provider.configured?'已配置；粘贴新 Key 可替换':'粘贴 API Key'});
+    const msgId='provider-msg-'+provider.id;
+    const toggle=el('button',{class:'btn-ghost',type:'button',text:'👁',title:'显示/隐藏',onclick:()=>{input.type=input.type==='password'?'text':'password'}});
+    const verify=el('button',{class:'btn-ghost',type:'button',text:'验证',onclick:async()=>{
+      verify.disabled=true;setMsg(msgId,'正在连接服务商验证…');
+      const result=await postJSON('/api/settings/verify',{provider:provider.id,key:input.value.trim()||null});
+      verify.disabled=false;
+      setMsg(msgId,result.data.message||result.data.error||'验证失败',result.ok&&result.data.ok?'ok':'bad');
+    }});
+    const save=el('button',{class:'btn-solid',type:'button',text:'保存',onclick:async()=>{
+      const value=input.value.trim();
+      if(!value){setMsg(msgId,'请先粘贴 Key','bad');return}
+      save.disabled=true;
+      const result=await postJSON('/api/settings',{secrets:{[provider.field]:value}});
+      save.disabled=false;
+      if(!result.ok){setMsg(msgId,result.data.error||'保存失败','bad');return}
+      settingsData=result.data;input.value='';renderProviders();
+      setMsg(msgId,provider.source==='env'?'已保存；但环境变量优先生效':'已保存到本机，立即生效','ok');
+      loadCapabilities();
+    }});
+    const clear=el('button',{class:'btn-ghost',type:'button',text:'清除',onclick:async()=>{
+      const result=await postJSON('/api/settings',{secrets:{[provider.field]:null}});
+      if(!result.ok){setMsg(msgId,result.data.error||'清除失败','bad');return}
+      settingsData=result.data;renderProviders();setMsg(msgId,'已从本机删除','ok');loadCapabilities();
+    }});
+    if(!provider.configured||provider.source!=='config')clear.disabled=true;
+    const getKey=el('a',{class:'btn-ghost',href:String(provider.get_key_url),target:'_blank',rel:'noopener noreferrer',text:'获取 Key ↗'});
+    list.append(el('div',{class:'provider-card'},
+      el('div',{class:'provider-head'},el('span',{class:'provider-name',text:provider.label}),sourceChip(provider)),
+      el('ul',{class:'provider-uses'},(provider.uses||[]).map(text=>el('li',{text:String(text)}))),
+      el('div',{class:'key-row'},input,toggle),
+      el('div',{class:'key-row',style:'margin-top:8px'},getKey,verify,save,clear),
+      el('div',{class:'settings-note',style:'margin:.5rem 0 0',text:String(provider.hint||'')}),
+      el('div',{class:'settings-msg',id:msgId,role:'status'})));
+  });
+}
+function fillSelect(select,values,current,labels={}){
+  select.replaceChildren(...values.map(value=>el('option',{value:String(value),text:labels[value]||String(value)})));
+  if(current!==undefined&&values.includes(current))select.value=current;
+}
+function renderOptionFields(){
+  const options=settingsData.options||{}, choices=settingsData.choices||{};
+  fillSelect(document.getElementById('opt-whisper-model'),choices.whisper_models||[],options.whisper_model&&options.whisper_model.value);
+  fillSelect(document.getElementById('opt-whisper-language'),choices.whisper_languages||[],options.whisper_language&&options.whisper_language.value,{zh:'zh · 中文（默认）',auto:'auto · 自动识别',en:'en · 英语',ja:'ja · 日语',ko:'ko · 韩语',yue:'yue · 粤语'});
+  document.getElementById('opt-auto-update').checked=!(options.auto_update_tools&&options.auto_update_tools.value===false);
+  document.getElementById('opt-cookies-file').value=String((options.cookies_file&&options.cookies_file.value)||'');
+  document.getElementById('opt-douyin-state').value=String((options.douyin_storage_state&&options.douyin_storage_state.value)||'');
+  const xhs=(settingsData.secrets||{}).xhs_cookie||{};
+  document.getElementById('opt-xhs-status').textContent=xhs.configured?(xhs.source==='env'?`来自环境变量 ${xhs.env}`:`已保存（${xhs.preview}）`):'未设置';
+  renderEngineList();
+}
+function renderEngineList(){
+  const options=(settingsData&&settingsData.options)||{};
+  const whisperModel=(options.whisper_model&&options.whisper_model.value)||'turbo';
+  const rows=[
+    ['doubao','豆包录音文件识别 2.0','volc.seedasr.auc · 云端 · 需豆包 Key'],
+    ['tele','TeleSpeechASR','TeleAI/TeleSpeechASR · 云端 · 需硅基流动 Key'],
+    ['funasr','FunASR','paraformer-zh · 本地 · pip install funasr torch'],
+    ['whisper','Whisper',`${whisperModel} · 本地 · pip install openai-whisper`],
+  ];
+  document.getElementById('engine-list').replaceChildren(...rows.map(([id,name,model],index)=>{
+    const ready=engineConfigured(id);
+    return el('li',{},el('span',{},el('strong',{text:`${index+1}. ${name}`}),el('br'),el('span',{class:'engine-model',text:model})),
+      el('span',{class:'chip '+(ready?'ok':''),text:ready?'就绪':(['doubao','tele'].includes(id)?'未配置 Key':'未安装')}));
+  }));
+}
+async function loadModels(){
+  if(!settingsData)await loadSettings();
+  const select=document.getElementById('opt-enrich-model'), custom=document.getElementById('opt-enrich-custom');
+  const current=String(((settingsData.options||{}).enrich_model||{}).value||'');
+  let models=(settingsData.choices||{}).enrich_model_presets||[], source='presets';
+  try{const response=await fetch('/api/settings/models');const data=await response.json();if(Array.isArray(data.models)&&data.models.length){models=data.models;source=data.source}}catch(e){}
+  const values=[...new Set([current,...models].filter(Boolean))];
+  fillSelect(select,[...values,'__custom__'],current,{__custom__:'自定义…'});
+  custom.style.display='none';
+  document.getElementById('opt-enrich-note').textContent=(source==='siliconflow'?`已从你的硅基流动账号读取 ${models.length} 个可用对话模型。`:'配置硅基流动 Key 后会列出账号可用的全部模型。')+' 仅在勾选“AI 摘要”时，把最多 4000 字文稿节选发送给该模型。';
+  renderEngineList();
+}
+async function saveModelOptions(){
+  const select=document.getElementById('opt-enrich-model');
+  const model=select.value==='__custom__'?document.getElementById('opt-enrich-custom').value.trim():select.value;
+  const result=await postJSON('/api/settings',{options:{enrich_model:model,whisper_model:document.getElementById('opt-whisper-model').value,whisper_language:document.getElementById('opt-whisper-language').value}});
+  if(!result.ok){setMsg('models-msg',result.data.error||'保存失败','bad');return}
+  settingsData=result.data;renderOptionFields();setMsg('models-msg','已保存，新任务立即使用','ok');
+}
+async function saveAdvanced(clearXhs=false){
+  const payload={options:{cookies_file:document.getElementById('opt-cookies-file').value.trim(),douyin_storage_state:document.getElementById('opt-douyin-state').value.trim()}};
+  const xhs=document.getElementById('opt-xhs-cookie').value.trim();
+  if(clearXhs)payload.secrets={xhs_cookie:null};else if(xhs)payload.secrets={xhs_cookie:xhs};
+  const result=await postJSON('/api/settings',payload);
+  if(!result.ok){setMsg('advanced-msg',result.data.error||'保存失败','bad');return}
+  settingsData=result.data;document.getElementById('opt-xhs-cookie').value='';renderOptionFields();setMsg('advanced-msg','已保存','ok');
+}
+async function loadTools(refresh){
+  if(toolsPoll){clearTimeout(toolsPoll);toolsPoll=null}
+  setMsg('tools-msg',refresh?'正在查询各工具的最新稳定版…':'正在读取…');
+  document.getElementById('tools-check-btn').disabled=true;
+  let data;
+  try{const response=await fetch('/api/tools'+(refresh?'?refresh=1':''));data=await response.json()}
+  catch(e){setMsg('tools-msg','读取失败','bad');document.getElementById('tools-check-btn').disabled=false;return}
+  document.getElementById('tools-check-btn').disabled=Boolean(data.running);
+  document.getElementById('tools-age').textContent=String(data.min_release_age_days||7);
+  renderTools(data);
+  if(data.running){
+    setMsg('tools-msg',`正在更新 ${data.running}…（可关闭窗口，后台继续）`);
+    toolsPoll=setTimeout(()=>loadTools(false),3000);
+  }else{
+    const last=(data.results||[]).slice(-1)[0];
+    const checked=data.checked_at?new Date(data.checked_at*1000).toLocaleString():'';
+    setMsg('tools-msg',last&&Date.now()/1000-last.at<120?`${last.ok?'✅':'❌'} ${last.id}：${last.message}`:(checked?`上次检查：${checked}`:''),last&&!last.ok&&Date.now()/1000-last.at<120?'bad':'');
+    if(last&&last.ok)loadCapabilities();
+  }
+}
+function renderTools(data){
+  const body=document.getElementById('tools-body');
+  body.replaceChildren(...(data.components||[]).map(row=>{
+    const [label,kind]=statusLabels[row.status]||[String(row.status||''),''];
+    let action=null;
+    if(row.updatable&&row.status==='update_available'){
+      action=el('button',{class:'btn-solid',type:'button',text:'更新',style:'margin-top:4px',onclick:async()=>{
+        const result=await postJSON('/api/tools/update',{id:row.id});
+        if(!result.ok){setMsg('tools-msg',result.data.error||'无法开始更新','bad');return}
+        loadTools(false);
+      }});
+      if(data.running)action.disabled=true;
+    }else if(row.status==='update_available'||(row.status==='not_installed'&&row.id!=='funasr')){
+      action=el('span',{class:'tool-hint',text:String(row.hint||'')});
+    }
+    const latest=row.latest?(row.target&&row.target!==row.latest?`${row.latest}（冷却期，暂用 ${row.target}）`:row.latest):(row.check_error?'查询失败':'—');
+    return el('tr',{},
+      el('td',{},el('strong',{text:String(row.label)}),el('span',{class:'tool-role',text:String(row.role||'')})),
+      el('td',{text:String(row.version||'—')}),
+      el('td',{text:latest}),
+      el('td',{},el('span',{class:'chip '+kind,text:data.running===row.id?'更新中…':label}),action));
+  }));
+}
+
 function bindStaticEvents(){
+  document.querySelectorAll('[data-open-settings]').forEach(button=>button.addEventListener('click',event=>{event.stopPropagation();openSettings(button.dataset.openSettings)}));
+  document.querySelectorAll('[data-settings-tab]').forEach(button=>button.addEventListener('click',()=>switchSettingsTab(button.dataset.settingsTab)));
+  document.getElementById('save-models-btn').addEventListener('click',saveModelOptions);
+  document.getElementById('save-advanced-btn').addEventListener('click',()=>saveAdvanced(false));
+  document.getElementById('clear-xhs-btn').addEventListener('click',()=>saveAdvanced(true));
+  document.getElementById('tools-check-btn').addEventListener('click',()=>loadTools(true));
+  document.getElementById('opt-enrich-model').addEventListener('change',event=>{document.getElementById('opt-enrich-custom').style.display=event.target.value==='__custom__'?'block':'none'});
+  document.getElementById('opt-auto-update').addEventListener('change',async event=>{
+    const result=await postJSON('/api/settings',{options:{auto_update_tools:event.target.checked}});
+    setMsg('tools-msg',result.ok?(event.target.checked?'已开启自动更新':'已关闭自动更新'):(result.data.error||'保存失败'),result.ok?'ok':'bad');
+  });
   document.querySelectorAll('[data-open-modal]').forEach(card=>{
     const open=()=>openModal(card.dataset.openModal);
     card.addEventListener('click',open);
@@ -897,7 +1214,6 @@ function bindStaticEvents(){
   document.getElementById('dl-btn').addEventListener('click',startDownload);
   document.getElementById('tr-btn').addEventListener('click',startTranscribe);
   document.getElementById('lo-btn').addEventListener('click',startLocalTranscribe);
-  document.getElementById('runtime-update-btn').addEventListener('click',()=>loadCapabilities(true));
   document.querySelectorAll('[data-tab-target]').forEach(button=>button.addEventListener('click',()=>switchTab(button,button.dataset.tabTarget)));
 
   const uploadZone=document.getElementById('upload-zone');
