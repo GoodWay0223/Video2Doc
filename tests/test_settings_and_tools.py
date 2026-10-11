@@ -173,17 +173,17 @@ class ToolUpdateTests(unittest.TestCase):
             result = tool_updates.pypi_release("yt-dlp", now=now)
         self.assertEqual({"latest": "2026.10.9", "target": "2026.9.20"}, result)
 
+    @unittest.skipUnless(os.name == "nt", "in-place FFmpeg updates are Windows-only")
     def test_ffmpeg_is_only_updated_inside_a_dedicated_directory(self):
         root = Path(__file__).resolve().parent / ("ffmpeg-test-" + uuid.uuid4().hex)
         try:
             (root / "bin").mkdir(parents=True)
             for name in ("ffmpeg.exe", "ffprobe.exe"):
                 (root / "bin" / name).write_bytes(b"x")
-            with mock.patch.object(tool_updates.os, "name", "nt"):
-                self.assertEqual(("standalone", root.resolve()),
-                                 tool_updates._ffmpeg_layout(root / "bin" / "ffmpeg.exe"))
-                (root / "unrelated-project").mkdir()
-                self.assertEqual("manual", tool_updates._ffmpeg_layout(root / "bin" / "ffmpeg.exe")[0])
+            self.assertEqual(("standalone", root.resolve()),
+                             tool_updates._ffmpeg_layout(root / "bin" / "ffmpeg.exe"))
+            (root / "unrelated-project").mkdir()
+            self.assertEqual("manual", tool_updates._ffmpeg_layout(root / "bin" / "ffmpeg.exe")[0])
         finally:
             shutil.rmtree(root, ignore_errors=True)
 
