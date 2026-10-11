@@ -63,6 +63,7 @@ def build_job(item, args):
         "allow_enrichment": not (args.no_enrich or args.local_only),
         "hotwords": pipeline.parse_hotwords(args.hotwords or ""),
         "illustrated": args.illustrated,
+        "replacements": pipeline.parse_replacements(args.replace or []),
     }
     local = Path(item).expanduser()
     if local.is_file():
@@ -133,6 +134,8 @@ def main(argv=None):
                         help="隐私模式：仅本地文件，仅 FunASR/Whisper，禁止任何云端调用")
     parser.add_argument("--no-enrich", action="store_true", help="不调用云端 AI 摘要/要点/标签")
     parser.add_argument("--hotwords", help="热词：人名/术语，逗号分隔，提高识别准确率（豆包 / Whisper）")
+    parser.add_argument("--replace", action="append", metavar="错词=>正确词",
+                        help="识别后替换（可重复），例如 --replace \"金桔蚕=>京极彩\"")
     parser.add_argument("--illustrated", action="store_true",
                         help="生成图文稿：截取每张幻灯片/画面并配上对应原文（HTML + Markdown 图片包）")
     parser.add_argument("--output", help=f"输出根目录（默认 {OUTPUT_DIR}）")

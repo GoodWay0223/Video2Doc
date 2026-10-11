@@ -1046,6 +1046,43 @@ def asr_hotwords(job):
                           + parse_hotwords(_read_config().get("hotwords", "")))
 
 
+def parse_replacements(value):
+    """Lines like `错词 => 正确词` (also `->`, `→`, `=`); returns ordered (old, new) pairs."""
+    pairs = []
+    items = value if isinstance(value, (list, tuple)) else str(value or "").splitlines()
+    for item in items:
+        if isinstance(item, (list, tuple)) and len(item) == 2:
+            old, new = (str(part).strip() for part in item)
+        else:
+            parts = re.split(r"\s*(?:=>|->|→|=)\s*", str(item).strip(), maxsplit=1)
+            if len(parts) != 2:
+                continue
+            old, new = parts[0].strip(), parts[1].strip()
+        if old and old != new and len(old) <= 100 and len(new) <= 100 and (old, new) not in pairs:
+            pairs.append((old, new))
+    return pairs[:500]
+
+
+def transcript_replacements(job):
+    return parse_replacements(list(getattr(job, "replacements", None) or [])
+                              + parse_replacements(_read_config().get("replacements", "")))
+
+
+def apply_replacements(transcript, pairs):
+    """Fix recurring recognition errors in every segment and in the full text."""
+    if not pairs:
+        return transcript
+    def fix(text):
+        for old, new in pairs:
+            text = text.replace(old, new)
+        return text
+    transcript = dict(transcript)
+    transcript["segments"] = [{**segment, "text": fix(str(segment.get("text", "")))}
+                              for segment in transcript.get("segments", [])]
+    transcript["text"] = fix(str(transcript.get("text", "")))
+    return transcript
+
+
 def _doubao_context(job):
     """Hotwords + the video title as scene context (Doubao 2.0 `corpus.context`)."""
     context = {}
@@ -1731,6 +1768,7 @@ def _fail(job, exc):
 
 
 def _finish_transcript(job, transcript, video=None):
+    transcript = apply_replacements(transcript, transcript_replacements(job))
     _write_json(job.dir / "raw" / "tele_result.json", transcript)
     text = str(transcript.get("text", ""))
     if not job.title:

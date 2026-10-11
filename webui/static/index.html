@@ -373,7 +373,7 @@ body {
   <div class="history-section" id="history-section"></div>
 
   <!-- Footer -->
-  <div class="footer">Video2Doc v0.10.0 · 本机运行 · 任务结果保存到本地</div>
+  <div class="footer">Video2Doc v0.11.0 · 本机运行 · 任务结果保存到本地</div>
 
 </div>
 
@@ -539,6 +539,11 @@ body {
         <label for="opt-hotwords">常用热词（全局，所有任务都会使用）</label>
         <textarea id="opt-hotwords" class="form-control" rows="3" maxlength="4000" placeholder="逗号或换行分隔，例如：动物森友会, 任天堂, CEDEC"></textarea>
         <small>提高人名、术语的识别准确率（豆包 2.0 热词直传，最多 200 个；Whisper 作为提示词）。单个任务的热词可在转文稿窗口里填写。</small>
+      </div>
+      <div class="field">
+        <label for="opt-replacements">识别后替换（每行一条：错词 =&gt; 正确词）</label>
+        <textarea id="opt-replacements" class="form-control" rows="3" maxlength="20000" placeholder="CDEC => CEDEC&#10;踩刹 => 踩镲"></textarea>
+        <small>热词仍识别错的固定错误，在导出前统一替换（全部任务生效）。</small>
       </div>
       <button class="btn-solid" type="button" id="save-models-btn">保存模型设置</button>
       <div class="settings-msg" id="models-msg" role="status"></div>
@@ -1121,6 +1126,7 @@ function renderOptionFields(){
   fillSelect(document.getElementById('opt-whisper-model'),choices.whisper_models||[],options.whisper_model&&options.whisper_model.value);
   fillSelect(document.getElementById('opt-whisper-language'),choices.whisper_languages||[],options.whisper_language&&options.whisper_language.value,{zh:'zh · 中文（默认）',auto:'auto · 自动识别',en:'en · 英语',ja:'ja · 日语',ko:'ko · 韩语',yue:'yue · 粤语'});
   document.getElementById('opt-hotwords').value=String((options.hotwords&&options.hotwords.value)||'');
+  document.getElementById('opt-replacements').value=String((options.replacements&&options.replacements.value)||'');
   document.getElementById('opt-auto-update').checked=!(options.auto_update_tools&&options.auto_update_tools.value===false);
   document.getElementById('opt-cookies-file').value=String((options.cookies_file&&options.cookies_file.value)||'');
   document.getElementById('opt-douyin-state').value=String((options.douyin_storage_state&&options.douyin_storage_state.value)||'');
@@ -1158,7 +1164,7 @@ async function loadModels(){
 async function saveModelOptions(){
   const select=document.getElementById('opt-enrich-model');
   const model=select.value==='__custom__'?document.getElementById('opt-enrich-custom').value.trim():select.value;
-  const result=await postJSON('/api/settings',{options:{enrich_model:model,whisper_model:document.getElementById('opt-whisper-model').value,whisper_language:document.getElementById('opt-whisper-language').value,hotwords:document.getElementById('opt-hotwords').value}});
+  const result=await postJSON('/api/settings',{options:{enrich_model:model,whisper_model:document.getElementById('opt-whisper-model').value,whisper_language:document.getElementById('opt-whisper-language').value,hotwords:document.getElementById('opt-hotwords').value,replacements:document.getElementById('opt-replacements').value}});
   if(!result.ok){setMsg('models-msg',result.data.error||'保存失败','bad');return}
   settingsData=result.data;renderOptionFields();setMsg('models-msg','已保存，新任务立即使用','ok');
 }

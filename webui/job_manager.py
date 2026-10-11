@@ -29,7 +29,7 @@ class Job:
     def __init__(self, job_id=None, url="", job_type=JobType.TRANSCRIBE_ONLINE,
                  mode="transcript", formats=None, domain=None, engine="auto",
                  local_only=False, allow_enrichment=True, job_dir=None, hotwords=None,
-                 illustrated=False):
+                 illustrated=False, replacements=None):
         self.id = job_id or uuid.uuid4().hex[:12]
         self.url = url
         self.type = job_type
@@ -41,6 +41,7 @@ class Job:
         self.allow_enrichment = bool(allow_enrichment)
         self.hotwords = list(hotwords or [])
         self.illustrated = bool(illustrated)  # also export slide images + 图文稿
+        self.replacements = [list(pair) for pair in (replacements or [])]  # [[错词, 正确词], ...]
         self.engine_used = ""            # 实际成功的引擎
         self.engine_note = ""            # 引擎切换提示（如"已自动切换到 tele"）
         self.status = "queued"
@@ -70,6 +71,7 @@ class Job:
             "engine": self.engine, "local_only": self.local_only,
             "allow_enrichment": self.allow_enrichment,
             "hotwords": self.hotwords, "illustrated": self.illustrated,
+            "replacements": self.replacements,
             "engine_used": self.engine_used, "engine_note": self.engine_note,
             "status": self.status, "progress": self.progress,
             "title": self.title, "duration": self.duration,

@@ -1071,6 +1071,12 @@ python video2doc.py --download "https://youtu.be/xxxx" --json
 python video2doc.py "<URL>" --illustrated --format all --hotwords "人名,术语"
 ```
 
+Recurring recognition errors can be fixed at export time with
+`--replace "错词=>正确词"` (repeatable) or the global rules in Settings.
+To publish an illustrated transcript to a Lark/Feishu doc (requires a logged-in
+`lark-cli`): `python scripts/publish_lark.py --job output/<id> --new "标题"` or
+`--doc <url> [--after-block <block_id>]`; reruns resume from the checkpoint.
+
 Progress is printed to stderr; with `--json`, stdout contains only the result
 JSON. For learning material, prefer `--illustrated`; then proofread proper
 nouns against an authoritative source (official pages / articles) before

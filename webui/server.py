@@ -197,6 +197,14 @@ def parse_hotwords_field(value):
     return pipeline.parse_hotwords(value)
 
 
+def parse_replacements_field(value):
+    if value is None:
+        return []
+    if not isinstance(value, (str, list)) or len(str(value)) > 20000:
+        raise RequestValidationError("replacements 格式无效")
+    return pipeline.parse_replacements(value)
+
+
 def parse_bool(value, field, default=False):
     """Parse a strict boolean from JSON booleans or multipart text fields."""
     if value is None:
@@ -488,6 +496,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 allow_enrichment=allow_enrichment,
                 hotwords=parse_hotwords_field(data.get("hotwords")),
                 illustrated=parse_bool(data.get("illustrated"), "illustrated", False),
+                replacements=parse_replacements_field(data.get("replacements")),
             )
             job_manager.add_job(job)
             job_manager.submit(job, pipeline.run_transcribe_pipeline)

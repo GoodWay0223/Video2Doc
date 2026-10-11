@@ -13,8 +13,8 @@
 
 前往 [GitHub Releases](https://github.com/GoodWay0223/Video2Doc/releases/latest)，优先下载：
 
-- `Video2Doc-v0.10.0.zip` — Windows/macOS 共用的跨平台源码包
-- `Video2Doc-v0.10.0.zip.sha256` — ZIP 的 SHA-256 校验值
+- `Video2Doc-v0.11.0.zip` — Windows/macOS 共用的跨平台源码包
+- `Video2Doc-v0.11.0.zip.sha256` — ZIP 的 SHA-256 校验值
 
 该 ZIP 不是 `.exe` 或 `.app` 安装包，仍需本机安装 Python 3.10+ 和 ffmpeg。GitHub 自动生成的 “Source code” 归档没有经过项目发布构建器的清理、清单与跨平台启动器检查，因此不作为首选下载。
 
@@ -325,10 +325,10 @@ python3 scripts/check_setup.py
 
 ### 从 v0.7.x 或更早版本升级
 
-1. 下载新的 `Video2Doc-v0.10.0.zip`，解压到新目录；不要直接覆盖正在运行的旧目录。
+1. 下载新的 `Video2Doc-v0.11.0.zip`，解压到新目录；不要直接覆盖正在运行的旧目录。
 2. API Key 继续使用系统环境变量或 `~/.video2doc/config.json`，发布包不包含任何凭据。
 3. 如需保留旧任务，请单独备份旧目录中的 `output/`；新发布包不会包含运行产物。
-4. 重新运行 `python -m pip install -r requirements.txt` 和环境自检，再启动 v0.10.0。
+4. 重新运行 `python -m pip install -r requirements.txt` 和环境自检，再启动 v0.11.0。
 5. v0.6.0 起默认只监听 `127.0.0.1`。如过去依赖局域网访问，需要显式传入 `--host 0.0.0.0`；该模式当前没有认证或 HTTPS，不适合敏感文件。
 
 ### 验证 SHA-256
@@ -336,15 +336,15 @@ python3 scripts/check_setup.py
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\Video2Doc-v0.10.0.zip -Algorithm SHA256
-Get-Content .\Video2Doc-v0.10.0.zip.sha256
+Get-FileHash .\Video2Doc-v0.11.0.zip -Algorithm SHA256
+Get-Content .\Video2Doc-v0.11.0.zip.sha256
 ```
 
 macOS：
 
 ```bash
-shasum -a 256 Video2Doc-v0.10.0.zip
-cat Video2Doc-v0.10.0.zip.sha256
+shasum -a 256 Video2Doc-v0.11.0.zip
+cat Video2Doc-v0.11.0.zip.sha256
 ```
 
 两边的哈希值必须完全一致。ZIP 内还包含 `RELEASE-MANIFEST.json`，列出每个源码文件的大小与 SHA-256。
@@ -367,6 +367,8 @@ cat Video2Doc-v0.10.0.zip.sha256
 - **图文稿（可选）**：自动检测幻灯片 / 画面切换，每张截图下面配上它在屏幕上时讲的原文，并标注时间段；输出可离线打开的单文件 HTML，以及 Markdown + 图片压缩包。适合讲座、教程、发布会（链接与本地视频均可，勾选“生成图文稿”或 CLI `--illustrated`）
 - **热词与上下文**：人名、术语可作为热词交给豆包 2.0（官方 `corpus.context` 热词直传）和 Whisper；视频标题自动作为识别上下文。单任务在转文稿窗口填写，全局热词在 ⚙️ 设置 → 模型 中配置
 - **B站清晰度**：免登录即可获取 720p/1080p 公开画面（此前匿名只有 480p），下载与图文稿截图更清晰
+- **识别后替换**：热词仍识别错的固定错误（如 `CDEC => CEDEC`），在 ⚙️ 设置 → 模型 中按行填写，或 CLI `--replace "错=>对"`，导出前统一替换
+- **发布到飞书 / Lark 文档**：`python scripts/publish_lark.py --job output/<任务 ID> --new "标题"`（或 `--doc <链接> [--after-block <block_id>]`），把图文稿按“截图 + 原文”逐段写入文档并附上文字稿 / 字幕文件；中断后重跑会从断点继续。需要先安装并登录官方 [lark-cli](https://github.com/larksuite/cli)
 - **隐私控制**：云端增强可关闭；本地媒体支持仅本地处理模式
 - **Agent 深度分析蓝图**：分章 + SVG 图解 + 关键帧截图（尚未接入 Web 主流程）
 - **智能校正规则库**：`scripts/apply_corrections.py` / `scripts/export_formats.py --correct` 可用，默认流程不自动改写文稿
